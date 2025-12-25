@@ -103,9 +103,13 @@ void loop() {
 
     switch (currentState) {
         case STATE_INIT:
-             
-            currentState = STATE_CALIBRATING;
-            performCalibration();
+            if (faultDetect.isCalibrated()) {
+                DEBUG_PRINTLN("Baseline found in storage. Skipping calibration.");
+                currentState = STATE_MONITORING;
+            } else {
+                currentState = STATE_CALIBRATING;
+                performCalibration();
+            }
             break;
 
         case STATE_CALIBRATING:
