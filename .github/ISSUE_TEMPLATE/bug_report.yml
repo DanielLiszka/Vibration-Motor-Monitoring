@@ -1,0 +1,47 @@
+name: Bug report
+description: Report a problem with the firmware, dashboard, or tooling.
+title: "Bug: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report an issue.
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What happened and what you expected to happen.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: Provide a minimal set of steps so we can reproduce the issue.
+      placeholder: |
+        1. Flash firmware...
+        2. Start motor...
+        3. Observe...
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs and serial output
+      description: Paste relevant output from `pio device monitor` or PlatformIO build logs.
+      render: text
+    validations:
+      required: false
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Board, sensor module, PlatformIO version, and OS.
+      placeholder: |
+        - Board: esp32dev
+        - Sensor: MPU6050 (0x68)
+        - PlatformIO: 6.x
+        - OS: Windows/Linux/macOS
+    validations:
+      required: false
