@@ -36,7 +36,7 @@ SCL    -->  GPIO 22
 
 2. Clone and configure:
 ```bash
-git clone <your-repo-url>
+git clone https://github.com/DanielLiszka/Embedded_Project.git
 cd Embedded_Project
 ```
 
