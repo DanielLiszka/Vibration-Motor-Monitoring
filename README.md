@@ -52,6 +52,7 @@ cd Embedded_Project
 pio run -e esp32dev -t upload
 pio device monitor
 ```
+If `pio` is not on your PATH, run the same commands via `python -m platformio`.
 
 5. Let the system run through calibration (about a minute with the motor running normally), then it starts monitoring.
 
