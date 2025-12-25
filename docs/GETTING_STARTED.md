@@ -53,7 +53,7 @@ pip install platformio
 
 ```bash
 # Clone repository
-git clone <your-repo-url>
+git clone https://github.com/DanielLiszka/Embedded_Project.git
 cd Embedded_Project
 
 # Open in VSCode (if using VSCode)
