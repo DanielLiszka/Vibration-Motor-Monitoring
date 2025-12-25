@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Motor Vibration Monitor</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <header>
+        <div class="header-content">
+            <h1>Motor Vibration Monitor</h1>
+            <div class="status-bar">
+                <span id="connection-status" class="status disconnected">Disconnected</span>
+                <span id="device-id" class="device-id"></span>
+            </div>
+        </div>
+    </header>
+
+    <nav class="nav-tabs">
+        <button class="nav-tab active" data-tab="dashboard">Dashboard</button>
+        <button class="nav-tab" data-tab="spectrum">Spectrum</button>
+        <button class="nav-tab" data-tab="trends">Trends</button>
+        <button class="nav-tab" data-tab="alerts">Alerts</button>
+        <button class="nav-tab" data-tab="config">Settings</button>
+    </nav>
+
+    <main>
+        <section id="dashboard" class="tab-content active">
+            <div class="grid-container">
+                <div class="card fault-status">
+                    <h2>Fault Status</h2>
+                    <div id="fault-indicator" class="fault-indicator normal">
+                        <span class="fault-icon">✓</span>
+                        <span class="fault-text">Normal Operation</span>
+                    </div>
+                    <div class="fault-details">
+                        <p>Confidence: <span id="fault-confidence">0</span>%</p>
+                        <p>Severity: <span id="fault-severity">None</span></p>
+                    </div>
+                </div>
+
+                <div class="card metrics-card">
+                    <h2>Vibration Metrics</h2>
+                    <div class="metrics-grid">
+                        <div class="metric">
+                            <span class="metric-label">RMS</span>
+                            <span class="metric-value" id="rms">0.00</span>
+                            <span class="metric-unit">g</span>
+                        </div>
+                        <div class="metric">
+                            <span class="metric-label">Peak-Peak</span>
+                            <span class="metric-value" id="peak-to-peak">0.00</span>
+                            <span class="metric-unit">g</span>
+                        </div>
+                        <div class="metric">
+                            <span class="metric-label">Kurtosis</span>
+                            <span class="metric-value" id="kurtosis">0.00</span>
+                        </div>
+                        <div class="metric">
+                            <span class="metric-label">Crest Factor</span>
+                            <span class="metric-value" id="crest-factor">0.00</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card chart-card">
+                    <h2>Real-Time Signal</h2>
+                    <canvas id="signal-chart"></canvas>
+                </div>
+
+                <div class="card system-status">
+                    <h2>System Status</h2>
+                    <div class="status-items">
+                        <div class="status-item">
+                            <span class="status-label">CPU Usage</span>
+                            <div class="progress-bar">
+                                <div id="cpu-bar" class="progress-fill" style="width: 0%"></div>
+                            </div>
+                            <span id="cpu-value" class="status-value">0%</span>
+                        </div>
+                        <div class="status-item">
+                            <span class="status-label">Memory</span>
+                            <div class="progress-bar">
+                                <div id="memory-bar" class="progress-fill" style="width: 0%"></div>
+                            </div>
+                            <span id="memory-value" class="status-value">0 KB</span>
+                        </div>
+                        <div class="status-item">
+                            <span class="status-label">WiFi Signal</span>
+                            <span id="wifi-rssi" class="status-value">-- dBm</span>
+                        </div>
+                        <div class="status-item">
+                            <span class="status-label">Uptime</span>
+                            <span id="uptime" class="status-value">0:00:00</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card frequency-card">
+                    <h2>Frequency Analysis</h2>
+                    <div class="freq-metrics">
+                        <div class="freq-item">
+                            <span class="freq-label">Dominant Frequency</span>
+                            <span class="freq-value" id="dominant-freq">0.0 Hz</span>
+                        </div>
+                        <div class="freq-item">
+                            <span class="freq-label">Spectral Centroid</span>
+                            <span class="freq-value" id="spectral-centroid">0.0 Hz</span>
+                        </div>
+                        <div class="freq-item">
+                            <span class="freq-label">Band Power Ratio</span>
+                            <span class="freq-value" id="band-power">0.00</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="spectrum" class="tab-content">
+            <div class="card full-width">
+                <h2>Frequency Spectrum</h2>
+                <canvas id="spectrum-chart"></canvas>
+                <div class="spectrum-controls">
+                    <label>
+                        Scale:
+                        <select id="spectrum-scale">
+                            <option value="linear">Linear</option>
+                            <option value="log">Logarithmic</option>
+                        </select>
+                    </label>
+                    <label>
+                        Window:
+                        <select id="window-type">
+                            <option value="0">Hanning</option>
+                            <option value="1">Hamming</option>
+                            <option value="2">Blackman</option>
+                        </select>
+                    </label>
+                </div>
+            </div>
+        </section>
+
+        <section id="trends" class="tab-content">
+            <div class="card full-width">
+                <h2>Historical Trends</h2>
+                <canvas id="trend-chart"></canvas>
+                <div class="trend-controls">
+                    <label>
+                        Time Range:
+                        <select id="trend-range">
+                            <option value="1h">Last Hour</option>
+                            <option value="6h">Last 6 Hours</option>
+                            <option value="24h">Last 24 Hours</option>
+                            <option value="7d">Last 7 Days</option>
+                        </select>
+                    </label>
+                    <label>
+                        Metric:
+                        <select id="trend-metric">
+                            <option value="rms">RMS</option>
+                            <option value="kurtosis">Kurtosis</option>
+                            <option value="crestFactor">Crest Factor</option>
+                            <option value="dominantFreq">Dominant Frequency</option>
+                        </select>
+                    </label>
+                </div>
+            </div>
+            <div class="grid-container">
+                <div class="card">
+                    <h3>Trend Analysis</h3>
+                    <div id="trend-analysis">
+                        <p>Status: <span id="trend-status">Stable</span></p>
+                        <p>Direction: <span id="trend-direction">—</span></p>
+                        <p>Rate of Change: <span id="trend-rate">0.00/hr</span></p>
+                    </div>
+                </div>
+                <div class="card">
+                    <h3>Predictions</h3>
+                    <div id="predictions">
+                        <p>Next Maintenance: <span id="next-maintenance">--</span></p>
+                        <p>Estimated Degradation: <span id="degradation">Normal</span></p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="alerts" class="tab-content">
+            <div class="card full-width">
+                <div class="alerts-header">
+                    <h2>Alert History</h2>
+                    <div class="alert-actions">
+                        <button id="ack-all-btn" class="btn btn-secondary">Acknowledge All</button>
+                        <button id="clear-all-btn" class="btn btn-danger">Clear All</button>
+                    </div>
+                </div>
+                <div id="alert-list" class="alert-list">
+                    <p class="no-alerts">No alerts</p>
+                </div>
+            </div>
+        </section>
+
+        <section id="config" class="tab-content">
+            <div class="grid-container">
+                <div class="card">
+                    <h2>Device Configuration</h2>
+                    <form id="config-form">
+                        <div class="form-group">
+                            <label for="device-name">Device Name</label>
+                            <input type="text" id="device-name" value="motor-monitor-001">
+                        </div>
+                        <div class="form-group">
+                            <label for="sample-rate">Sample Rate (Hz)</label>
+                            <input type="number" id="sample-rate" value="1000">
+                        </div>
+                        <div class="form-group">
+                            <label for="window-size">Window Size</label>
+                            <input type="number" id="window-size" value="256">
+                        </div>
+                        <button type="submit" class="btn btn-primary">Save Configuration</button>
+                    </form>
+                </div>
+
+                <div class="card">
+                    <h2>Threshold Settings</h2>
+                    <form id="threshold-form">
+                        <div class="form-group">
+                            <label for="rms-warning">RMS Warning Level</label>
+                            <input type="number" step="0.1" id="rms-warning" value="1.5">
+                        </div>
+                        <div class="form-group">
+                            <label for="rms-critical">RMS Critical Level</label>
+                            <input type="number" step="0.1" id="rms-critical" value="2.5">
+                        </div>
+                        <div class="form-group">
+                            <label for="kurtosis-warning">Kurtosis Warning Level</label>
+                            <input type="number" step="0.1" id="kurtosis-warning" value="5.0">
+                        </div>
+                        <button type="submit" class="btn btn-primary">Save Thresholds</button>
+                    </form>
+                </div>
+
+                <div class="card">
+                    <h2>Actions</h2>
+                    <div class="action-buttons">
+                        <button id="calibrate-btn" class="btn btn-primary">Calibrate Baseline</button>
+                        <button id="export-btn" class="btn btn-secondary">Export Data</button>
+                        <button id="reset-btn" class="btn btn-danger">Reset Device</button>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2>System Information</h2>
+                    <div id="system-info">
+                        <p>Firmware Version: <span id="firmware-version">--</span></p>
+                        <p>Chip Model: <span id="chip-model">--</span></p>
+                        <p>Flash Size: <span id="flash-size">--</span></p>
+                        <p>Free Heap: <span id="free-heap-info">--</span></p>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <p>Motor Vibration Fault Detection System</p>
+    </footer>
+
+    <script src="app.js"></script>
+</body>
+</html>
