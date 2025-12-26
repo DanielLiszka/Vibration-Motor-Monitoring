@@ -28,6 +28,11 @@
 #include "TFLiteEngine.h"
 #include "ModelManager.h"
 #include "SecurityManager.h"
+#include "ContinuousLearningManager.h"
+#include "OnlineLearner.h"
+#include "DriftDetector.h"
+#include "SelfCalibratingModel.h"
+#include <ArduinoJson.h>
 
 MPU6050Driver sensor;
 SignalProcessor signalProc;
@@ -57,6 +62,10 @@ EnsembleClassifier ensembleClassifier;
 TFLiteEngine tfliteEngine;
 ModelManager modelManager;
 SecurityManager securityMgr;
+OnlineLearner onlineLearner;
+DriftDetector driftDetector;
+SelfCalibratingModel selfCalibModel;
+ContinuousLearningManager clManager;
 
 enum SystemState {
     STATE_INIT,
@@ -84,6 +93,7 @@ void processVibrationData();
 void handleError(const String& errorMsg);
 void printSystemStatus();
 void blinkLED(uint8_t times, uint16_t delayMs = 200);
+void handleCloudMessage(const char* topic, const uint8_t* payload, size_t length);
 
 void setup() {
      
@@ -141,14 +151,14 @@ void loop() {
                 wifiMgr.loop();
                 webServer.loop();
                 mqttMgr.loop();
+                cloudConnector.loop();
                 otaUpdater.loop();
             }
 
             sysHardening.loop();
             modbusServer.loop();
-#ifdef USE_TFLITE
             modelManager.loop();
-#endif
+            clManager.update();
 
             perfMon.endLoop();
 
@@ -245,6 +255,33 @@ void initializeSystem() {
                 } else {
                     DEBUG_PRINTLN("   ⚠ MQTT failed\n");
                 }
+
+                DEBUG_PRINTLN("7b. Initializing Cloud Connector...");
+                CloudConfig cloudConfig;
+                memset(&cloudConfig, 0, sizeof(cloudConfig));
+                cloudConfig.provider = CLOUD_GENERIC_MQTT;
+                strncpy(cloudConfig.endpoint, MQTT_BROKER_ADDRESS, sizeof(cloudConfig.endpoint) - 1);
+                cloudConfig.port = MQTT_BROKER_PORT;
+
+                String cloudClientId = String(DEVICE_ID) + "-cloud";
+                strncpy(cloudConfig.deviceId, cloudClientId.c_str(), sizeof(cloudConfig.deviceId) - 1);
+                strncpy(cloudConfig.username, MQTT_USER, sizeof(cloudConfig.username) - 1);
+                strncpy(cloudConfig.password, MQTT_PASSWORD, sizeof(cloudConfig.password) - 1);
+                cloudConfig.useTLS = false;
+
+                cloudConnector.setWillMessage(
+                    (String("motor-monitor/") + cloudClientId + "/status").c_str(),
+                    "offline"
+                );
+
+                if (cloudConnector.begin(cloudConfig)) {
+                    cloudConnector.setMessageCallback(handleCloudMessage);
+                    cloudConnector.subscribeModelUpdates();
+                    cloudConnector.subscribeLabelResponses();
+                    DEBUG_PRINTLN("   ✓ Cloud Connector OK\n");
+                } else {
+                    DEBUG_PRINTLN("   ⚠ Cloud Connector failed\n");
+                }
             }
 
             DEBUG_PRINTLN("8. Initializing OTA Updater...");
@@ -294,14 +331,35 @@ void initializeSystem() {
         DEBUG_PRINTLN("   ⚠ Edge ML failed\n");
     }
 
-    DEBUG_PRINTLN("16. Initializing Maintenance Scheduler...");
+    DEBUG_PRINTLN("16. Initializing Online Learner...");
+    if (onlineLearner.begin()) {
+        DEBUG_PRINTLN("   ✓ Online Learner OK\n");
+    } else {
+        DEBUG_PRINTLN("   ⚠ Online Learner failed\n");
+    }
+
+    DEBUG_PRINTLN("17. Initializing Drift Detector...");
+    if (driftDetector.begin()) {
+        DEBUG_PRINTLN("   ✓ Drift Detector OK\n");
+    } else {
+        DEBUG_PRINTLN("   ⚠ Drift Detector failed\n");
+    }
+
+    DEBUG_PRINTLN("18. Initializing Self-Calibrating Model...");
+    if (selfCalibModel.begin()) {
+        DEBUG_PRINTLN("   ✓ Self-Calibrating Model OK\n");
+    } else {
+        DEBUG_PRINTLN("   ⚠ Self-Calibrating Model failed\n");
+    }
+
+    DEBUG_PRINTLN("19. Initializing Maintenance Scheduler...");
     if (maintScheduler.begin()) {
         DEBUG_PRINTLN("   ✓ Maintenance Scheduler OK\n");
     } else {
         DEBUG_PRINTLN("   ⚠ Maintenance Scheduler failed\n");
     }
 
-    DEBUG_PRINTLN("17. Initializing Energy Monitor...");
+    DEBUG_PRINTLN("20. Initializing Energy Monitor...");
     if (energyMon.begin()) {
         energyMon.setEnergyRate(0.12);
         DEBUG_PRINTLN("   ✓ Energy Monitor OK\n");
@@ -309,60 +367,80 @@ void initializeSystem() {
         DEBUG_PRINTLN("   ⚠ Energy Monitor failed\n");
     }
 
-    DEBUG_PRINTLN("18. Initializing Self-Diagnostic...");
+    DEBUG_PRINTLN("21. Initializing Self-Diagnostic...");
     selfDiag.begin();
     DEBUG_PRINTLN("   ✓ Self-Diagnostic OK\n");
 
-    DEBUG_PRINTLN("19. Initializing System Hardening...");
+    DEBUG_PRINTLN("22. Initializing System Hardening...");
     if (sysHardening.begin()) {
         DEBUG_PRINTLN("   ✓ System Hardening OK\n");
     } else {
         DEBUG_PRINTLN("   ⚠ System Hardening failed\n");
     }
 
-    DEBUG_PRINTLN("20. Initializing Security Manager...");
+    DEBUG_PRINTLN("23. Initializing Security Manager...");
     if (securityMgr.begin()) {
         DEBUG_PRINTLN("   ✓ Security Manager OK\n");
     } else {
         DEBUG_PRINTLN("   ⚠ Security Manager failed\n");
     }
 
-    DEBUG_PRINTLN("21. Initializing Extended Feature Extractor...");
+    DEBUG_PRINTLN("24. Initializing Extended Feature Extractor...");
     if (extFeatureExt.begin()) {
         DEBUG_PRINTLN("   ✓ Extended Feature Extractor OK\n");
     } else {
         DEBUG_PRINTLN("   ⚠ Extended Feature Extractor failed\n");
     }
 
-    DEBUG_PRINTLN("22. Initializing Ensemble Classifier...");
+    DEBUG_PRINTLN("25. Initializing Ensemble Classifier...");
     if (ensembleClassifier.begin()) {
         ensembleClassifier.setCustomNN(&edgeML);
         ensembleClassifier.setTFLiteEngine(&tfliteEngine);
+        ensembleClassifier.setOnlineLearner(&onlineLearner);
+        ensembleClassifier.setMethod(ENSEMBLE_WEIGHTED);
+        ensembleClassifier.addModel("CustomNN", BACKEND_CUSTOM_NN, 0.8f);
+        ensembleClassifier.addModel("OnlineLearner", BACKEND_ONLINE_LEARNER, 0.6f);
         DEBUG_PRINTLN("   ✓ Ensemble Classifier OK\n");
     } else {
         DEBUG_PRINTLN("   ⚠ Ensemble Classifier failed\n");
     }
 
 #ifdef USE_TFLITE
-    DEBUG_PRINTLN("23. Initializing TFLite Engine...");
+    DEBUG_PRINTLN("26. Initializing TFLite Engine...");
     if (tfliteEngine.begin()) {
         DEBUG_PRINTLN("   ✓ TFLite Engine OK\n");
     } else {
         DEBUG_PRINTLN("   ⚠ TFLite Engine failed\n");
     }
+#endif
 
-    DEBUG_PRINTLN("24. Initializing Model Manager...");
+    DEBUG_PRINTLN("27. Initializing Model Manager...");
     if (modelManager.begin()) {
+#ifdef USE_TFLITE
         modelManager.setTFLiteEngine(&tfliteEngine);
+#endif
         modelManager.setEdgeML(&edgeML);
         DEBUG_PRINTLN("   ✓ Model Manager OK\n");
     } else {
         DEBUG_PRINTLN("   ⚠ Model Manager failed\n");
     }
-#endif
+
+    DEBUG_PRINTLN("28. Initializing Continuous Learning Manager...");
+    clManager.setOnlineLearner(&onlineLearner);
+    clManager.setDriftDetector(&driftDetector);
+    clManager.setCalibrationModel(&selfCalibModel);
+    clManager.setDataLogger(&logger);
+    clManager.setCloudConnector(&cloudConnector);
+    clManager.setModelManager(&modelManager);
+    if (clManager.begin()) {
+        clManager.setActive(true);
+        DEBUG_PRINTLN("   ✓ Continuous Learning Manager OK\n");
+    } else {
+        DEBUG_PRINTLN("   ⚠ Continuous Learning Manager failed\n");
+    }
 
     if (WIFI_ENABLED && webServer.getServer()) {
-        DEBUG_PRINTLN("25. Initializing REST API...");
+        DEBUG_PRINTLN("29. Initializing REST API...");
         restApi = new RestAPI(webServer.getServer());
         if (restApi->begin()) {
             restApi->setFeatureExtractor(&featureExt);
@@ -378,7 +456,7 @@ void initializeSystem() {
         }
     }
 
-    DEBUG_PRINTLN("26. Initializing Modbus Server...");
+    DEBUG_PRINTLN("30. Initializing Modbus Server...");
     if (modbusServer.begin(true, false)) {
         modbusServer.setCalibrationCallback([]() {
             calibrationRequestPending = true;
@@ -392,7 +470,7 @@ void initializeSystem() {
     }
 
     DEBUG_PRINTLN("\n=== System Initialization Complete ===");
-    DEBUG_PRINTLN("Total Subsystems Initialized: 26\n");
+    DEBUG_PRINTLN("Total Subsystems Initialized: 30\n");
     blinkLED(3, 100);
 }
 
@@ -494,7 +572,7 @@ void monitorVibration() {
     if (signalProc.addSample(magnitude, 0)) {
 
         processVibrationData();
-        signalProc.reset();
+        signalProc.advanceWindow(0);
     }
 
     totalSamples++;
@@ -537,6 +615,16 @@ void processVibrationData() {
     logger.log(features, faultResult, temperature);
 
     dataBuffer.addRecord(features, faultDetected ? &faultResult : nullptr);
+
+    float clFeatures[10];
+    features.toArray(clFeatures);
+    FaultResult clPrediction = faultResult;
+    EnsemblePrediction ensemblePred = ensembleClassifier.predict(features);
+    if (ensemblePred.valid) {
+        clPrediction.type = static_cast<FaultType>(ensemblePred.predictedClass);
+        clPrediction.confidence = ensemblePred.confidence;
+    }
+    clManager.processSample(clFeatures, 10, clPrediction);
 
     trendAnalyzer.addSample(features, faultResult.anomalyScore);
     TrendAnalysis trends = trendAnalyzer.getAnalysis();
@@ -687,5 +775,67 @@ void blinkLED(uint8_t times, uint16_t delayMs) {
         delay(delayMs);
         digitalWrite(LED_STATUS_PIN, LOW);
         delay(delayMs);
+    }
+}
+
+void handleCloudMessage(const char* topic, const uint8_t* payload, size_t length) {
+    if (!topic || !payload || length == 0) return;
+
+    const String topicStr(topic);
+    if (!topicStr.endsWith("/labels/response")) return;
+
+    StaticJsonDocument<2048> doc;
+    DeserializationError err = deserializeJson(doc, payload, length);
+    if (err) return;
+
+    auto handleResponseObject = [](JsonObject obj) {
+        CloudLabelResponse resp;
+        resp.sampleId = obj["sampleId"] | 0;
+        if (resp.sampleId == 0) resp.sampleId = obj["sample_id"] | 0;
+        if (resp.sampleId == 0) resp.sampleId = obj["timestamp"] | 0;
+
+        resp.assignedLabel = obj["assignedLabel"] | 0;
+        if (resp.assignedLabel == 0) resp.assignedLabel = obj["label"] | 0;
+
+        resp.labelConfidence = obj["labelConfidence"] | 0.0f;
+        if (resp.labelConfidence == 0.0f) resp.labelConfidence = obj["confidence"] | 0.0f;
+
+        resp.requiresRetraining = obj["requiresRetraining"] | false;
+        if (!resp.requiresRetraining) resp.requiresRetraining = obj["retrain"] | false;
+        clManager.processLabelResponse(resp);
+    };
+
+    if (doc.is<JsonArray>()) {
+        for (JsonVariant v : doc.as<JsonArray>()) {
+            if (v.is<JsonObject>()) {
+                handleResponseObject(v.as<JsonObject>());
+            }
+        }
+        return;
+    }
+
+    JsonArray responses = doc["responses"].as<JsonArray>();
+    if (!responses.isNull()) {
+        for (JsonVariant v : responses) {
+            if (v.is<JsonObject>()) {
+                handleResponseObject(v.as<JsonObject>());
+            }
+        }
+        return;
+    }
+
+    JsonArray labels = doc["labels"].as<JsonArray>();
+    if (!labels.isNull()) {
+        for (JsonVariant v : labels) {
+            if (v.is<JsonObject>()) {
+                handleResponseObject(v.as<JsonObject>());
+            }
+        }
+        return;
+    }
+
+    JsonObject single = doc.as<JsonObject>();
+    if (!single.isNull()) {
+        handleResponseObject(single);
     }
 }

@@ -129,8 +129,18 @@ void ContinuousLearningManager::processSample(const float* features, size_t numF
 
     stats.totalSamplesCollected++;
 
+    if (!features || numFeatures == 0) return;
+
+    if (driftDetector) {
+        driftDetector->updatePredictionStats(static_cast<uint8_t>(prediction.type), prediction.confidence);
+    }
+
+    const size_t safeCount = min(numFeatures, (size_t)ONLINE_FEATURE_DIM);
+    float padded[ONLINE_FEATURE_DIM];
+    memset(padded, 0, sizeof(padded));
+    memcpy(padded, features, safeCount * sizeof(float));
+
     if (calibModel && currentState != CL_STATE_CALIBRATING) {
-        FeatureVector fv;
         calibModel->updateStatistics(features, numFeatures);
     }
 
@@ -155,19 +165,21 @@ void ContinuousLearningManager::processSample(const float* features, size_t numF
     }
 
     if (shouldCollect) {
-        collectSample(features, static_cast<uint8_t>(prediction.type),
+        collectSample(padded, static_cast<uint8_t>(prediction.type),
                      prediction.confidence, source);
     }
 
     if (driftDetector && shouldCheckDrift()) {
-        FeatureVector fv;
-        memcpy(&fv.rms, features, sizeof(float) * min(numFeatures, (size_t)16));
-        checkForDrift(fv);
+        driftDetector->updateStatistics(features, numFeatures);
+        DriftType drift = driftDetector->detectDrift();
+        if (drift != DRIFT_NONE) {
+            handleDriftDetected(drift);
+        }
         lastDriftCheckTime = millis();
     }
 
     if (onlineLearner && source == LABEL_AUTO_HIGH_CONFIDENCE) {
-        updateOnlineLearner(features, static_cast<uint8_t>(prediction.type),
+        updateOnlineLearner(padded, static_cast<uint8_t>(prediction.type),
                            prediction.confidence);
     }
 }
@@ -183,6 +195,14 @@ void ContinuousLearningManager::collectSample(const float* features, uint8_t pre
     sample.uploaded = false;
 
     addToPendingQueue(sample);
+
+    if (dataLogger) {
+        dataLogger->logTrainingSample(sample.features,
+                                      ONLINE_FEATURE_DIM,
+                                      sample.predictedLabel,
+                                      sample.confidence,
+                                      static_cast<uint8_t>(source));
+    }
 }
 
 void ContinuousLearningManager::addToPendingQueue(const PendingSample& sample) {
@@ -219,6 +239,8 @@ bool ContinuousLearningManager::uploadPendingSamples() {
     JsonArray samples = doc.createNestedArray("samples");
 
     size_t uploadCount = 0;
+    size_t uploadedTimestamps[CL_UPLOAD_BATCH_SIZE];
+
     for (size_t i = 0; i < pendingCount && uploadCount < CL_UPLOAD_BATCH_SIZE; i++) {
         if (!pendingSamples[i].uploaded) {
             JsonObject sample = samples.createNestedObject();
@@ -233,7 +255,7 @@ bool ContinuousLearningManager::uploadPendingSamples() {
             sample["label_source"] = static_cast<int>(pendingSamples[i].labelSource);
             sample["timestamp"] = pendingSamples[i].timestamp;
 
-            pendingSamples[i].uploaded = true;
+            uploadedTimestamps[uploadCount] = pendingSamples[i].timestamp;
             uploadCount++;
         }
     }
@@ -248,7 +270,7 @@ bool ContinuousLearningManager::uploadPendingSamples() {
     String payload;
     serializeJson(doc, payload);
 
-    bool success = cloudConnector->isConnected();
+    bool success = cloudConnector->uploadTrainingData(payload);
 
     if (success) {
         stats.samplesUploadedToCloud += uploadCount;
@@ -258,11 +280,27 @@ bool ContinuousLearningManager::uploadPendingSamples() {
 
         size_t remaining = 0;
         for (size_t i = 0; i < pendingCount; i++) {
-            if (!pendingSamples[i].uploaded) {
+            bool wasUploaded = false;
+            for (size_t j = 0; j < uploadCount; j++) {
+                if (pendingSamples[i].timestamp == uploadedTimestamps[j]) {
+                    wasUploaded = true;
+                    break;
+                }
+            }
+
+            if (!wasUploaded) {
                 if (remaining != i) {
                     pendingSamples[remaining] = pendingSamples[i];
                 }
                 remaining++;
+            } else if (dataLogger) {
+                for (size_t k = 0; k < dataLogger->getTrainingSampleCount(); k++) {
+                    TrainingSample* ts = dataLogger->getTrainingSample(k);
+                    if (ts && ts->timestamp == pendingSamples[i].timestamp) {
+                        dataLogger->markSampleUploaded(k);
+                        break;
+                    }
+                }
             }
         }
         pendingCount = remaining;
@@ -276,7 +314,8 @@ bool ContinuousLearningManager::checkForModelUpdate() {
         return false;
     }
 
-    return false;
+    String version;
+    return cloudConnector->checkModelUpdate(version);
 }
 
 bool ContinuousLearningManager::downloadAndApplyUpdate() {
@@ -286,8 +325,44 @@ bool ContinuousLearningManager::downloadAndApplyUpdate() {
 
     DEBUG_PRINTLN("Downloading model update...");
 
+    if (!cloudConnector->hasPendingModelUpdate()) {
+        return false;
+    }
+
+    const char* url = cloudConnector->getPendingModelUrl();
+    const char* version = cloudConnector->getPendingModelVersion();
+    if (!url || url[0] == '\0' || !version || version[0] == '\0') {
+        return false;
+    }
+
+    const size_t maxModelSize = 256 * 1024;
+    uint8_t* buffer = (uint8_t*)malloc(maxModelSize);
+    if (!buffer) {
+        DEBUG_PRINTLN("Failed to allocate buffer for model download");
+        return false;
+    }
+
+    size_t downloadedSize = 0;
+    bool downloaded = cloudConnector->downloadModel(url, buffer, maxModelSize, downloadedSize);
+    if (!downloaded || downloadedSize == 0) {
+        free(buffer);
+        DEBUG_PRINTLN("Model download failed");
+        return false;
+    }
+
+    bool swapped = modelManager->hotSwapModel((const char*)buffer, downloadedSize, version);
+    free(buffer);
+
+    if (swapped) {
+        cloudConnector->clearPendingModelUpdate();
+        if (modelUpdateCb) {
+            modelUpdateCb(true, version);
+        }
+        return true;
+    }
+
     if (modelUpdateCb) {
-        modelUpdateCb(true, "v1.0.1");
+        modelUpdateCb(false, version);
     }
 
     return false;
