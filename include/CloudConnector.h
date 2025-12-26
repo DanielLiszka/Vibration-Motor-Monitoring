@@ -12,6 +12,8 @@
 #define CLOUD_RECONNECT_INTERVAL 5000
 #define CLOUD_KEEPALIVE 60
 #define CLOUD_TIMEOUT 10000
+#define CLOUD_MODEL_VERSION_MAX_LEN 32
+#define CLOUD_MODEL_URL_MAX_LEN 192
 
 enum CloudProvider {
     CLOUD_NONE = 0,
@@ -94,6 +96,11 @@ public:
     void subscribeModelUpdates();
     void subscribeLabelResponses();
 
+    bool hasPendingModelUpdate() const { return modelUpdateAvailable; }
+    const char* getPendingModelVersion() const { return pendingModelVersion; }
+    const char* getPendingModelUrl() const { return pendingModelUrl; }
+    void clearPendingModelUpdate();
+
     void setMessageCallback(CloudMessageCallback callback) { messageCallback = callback; }
     void setEventCallback(CloudEventCallback callback) { eventCallback = callback; }
 
@@ -113,6 +120,11 @@ protected:
 
     uint32_t lastReconnectAttempt;
     uint32_t lastHeartbeat;
+    uint32_t lastModelCheckRequest;
+
+    char pendingModelVersion[CLOUD_MODEL_VERSION_MAX_LEN];
+    char pendingModelUrl[CLOUD_MODEL_URL_MAX_LEN];
+    bool modelUpdateAvailable;
 
     CloudMessageCallback messageCallback;
     CloudEventCallback eventCallback;
@@ -122,6 +134,8 @@ protected:
     virtual String buildTelemetryTopic();
     virtual String buildAlertTopic();
     virtual String buildCommandTopic();
+
+    String buildTopicRoot();
 
     void setConnectionState(CloudConnectionState state);
     void setupTLS();

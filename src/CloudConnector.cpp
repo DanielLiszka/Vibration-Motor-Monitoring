@@ -1,4 +1,6 @@
 #include "CloudConnector.h"
+#include <ArduinoJson.h>
+#include <HTTPClient.h>
 #include <mbedtls/md.h>
 #include <mbedtls/base64.h>
 
@@ -11,11 +13,15 @@ CloudConnector::CloudConnector()
     , connectionState(CLOUD_DISCONNECTED)
     , lastReconnectAttempt(0)
     , lastHeartbeat(0)
+    , lastModelCheckRequest(0)
+    , modelUpdateAvailable(false)
     , messageCallback(nullptr)
     , eventCallback(nullptr)
 {
     memset(&currentConfig, 0, sizeof(currentConfig));
     memset(&stats, 0, sizeof(stats));
+    memset(pendingModelVersion, 0, sizeof(pendingModelVersion));
+    memset(pendingModelUrl, 0, sizeof(pendingModelUrl));
     instance = this;
 }
 
@@ -31,6 +37,8 @@ bool CloudConnector::begin(const CloudConfig& config) {
     DEBUG_PRINTLN("Initializing Cloud Connector...");
 
     currentConfig = config;
+    clearPendingModelUpdate();
+    lastModelCheckRequest = 0;
 
     if (config.useTLS) {
         secureClient = new WiFiClientSecure();
@@ -62,6 +70,23 @@ bool CloudConnector::begin(const CloudConfig& config) {
     }
 
     return connect();
+}
+
+void CloudConnector::clearPendingModelUpdate() {
+    pendingModelVersion[0] = '\0';
+    pendingModelUrl[0] = '\0';
+    modelUpdateAvailable = false;
+}
+
+String CloudConnector::buildTopicRoot() {
+    String telemetry = buildTelemetryTopic();
+    while (telemetry.endsWith("/")) {
+        telemetry.remove(telemetry.length() - 1);
+    }
+
+    int lastSlash = telemetry.lastIndexOf('/');
+    if (lastSlash < 0) return telemetry;
+    return telemetry.substring(0, lastSlash);
 }
 
 void CloudConnector::loop() {
@@ -227,6 +252,26 @@ void CloudConnector::handleMessage(const char* topic, const uint8_t* payload, si
     stats.messagesReceived++;
     stats.bytesReceived += length;
 
+    if (topic && payload && length > 0) {
+        const String root = buildTopicRoot();
+        const String modelUpdateTopic = root + "/models/update";
+
+        if (String(topic) == modelUpdateTopic) {
+            StaticJsonDocument<512> doc;
+            DeserializationError err = deserializeJson(doc, payload, length);
+            if (!err) {
+                const char* version = doc["version"] | doc["model_version"] | "";
+                const char* url = doc["url"] | doc["model_url"] | "";
+
+                if (version && version[0] && url && url[0]) {
+                    strncpy(pendingModelVersion, version, sizeof(pendingModelVersion) - 1);
+                    strncpy(pendingModelUrl, url, sizeof(pendingModelUrl) - 1);
+                    modelUpdateAvailable = true;
+                }
+            }
+        }
+    }
+
     if (messageCallback) {
         messageCallback(topic, payload, length);
     }
@@ -289,6 +334,132 @@ String CloudConnector::buildAlertTopic() {
 
 String CloudConnector::buildCommandTopic() {
     return String(currentConfig.deviceId) + "/commands";
+}
+
+bool CloudConnector::uploadTrainingData(const String& samplesJson) {
+    if (!mqttClient || connectionState != CLOUD_CONNECTED) return false;
+    if (samplesJson.length() == 0) return false;
+
+    const String topic = buildTopicRoot() + "/training";
+    return publishJSON(topic.c_str(), samplesJson, 1);
+}
+
+bool CloudConnector::checkModelUpdate(String& availableVersion) {
+    availableVersion = "";
+
+    if (modelUpdateAvailable) {
+        availableVersion = String(pendingModelVersion);
+        return true;
+    }
+
+    if (!mqttClient || connectionState != CLOUD_CONNECTED) return false;
+
+    const uint32_t now = millis();
+    if (lastModelCheckRequest != 0 && (now - lastModelCheckRequest) < 60000) {
+        return false;
+    }
+    lastModelCheckRequest = now;
+
+    StaticJsonDocument<256> doc;
+    doc["device_id"] = currentConfig.deviceId;
+    doc["firmware_version"] = FIRMWARE_VERSION;
+    doc["timestamp"] = now;
+    doc["type"] = "model_check";
+
+    String payload;
+    serializeJson(doc, payload);
+
+    const String topic = buildTopicRoot() + "/models/check";
+    publishJSON(topic.c_str(), payload, 1);
+
+    return false;
+}
+
+bool CloudConnector::downloadModel(const char* modelUrl, uint8_t* buffer, size_t maxSize, size_t& downloadedSize) {
+    downloadedSize = 0;
+    if (!modelUrl || !buffer || maxSize == 0) return false;
+
+    HTTPClient http;
+    http.begin(modelUrl);
+    int httpCode = http.GET();
+    if (httpCode != HTTP_CODE_OK) {
+        http.end();
+        return false;
+    }
+
+    int contentLength = http.getSize();
+    WiFiClient* stream = http.getStreamPtr();
+
+    if (contentLength > 0 && (size_t)contentLength > maxSize) {
+        http.end();
+        return false;
+    }
+
+    uint32_t start = millis();
+    while (http.connected() && (contentLength < 0 || downloadedSize < (size_t)contentLength)) {
+        size_t available = stream->available();
+        if (available > 0) {
+            size_t toRead = available;
+            if (contentLength > 0) {
+                toRead = min(toRead, (size_t)contentLength - downloadedSize);
+            }
+            toRead = min(toRead, maxSize - downloadedSize);
+
+            if (toRead == 0) break;
+
+            size_t read = stream->readBytes(buffer + downloadedSize, toRead);
+            downloadedSize += read;
+        } else {
+            if (millis() - start > CLOUD_TIMEOUT) break;
+            delay(1);
+        }
+        yield();
+    }
+
+    http.end();
+
+    if (contentLength > 0) {
+        return downloadedSize == (size_t)contentLength;
+    }
+    return downloadedSize > 0;
+}
+
+bool CloudConnector::requestLabels(const String& sampleIds) {
+    if (!mqttClient || connectionState != CLOUD_CONNECTED) return false;
+    if (sampleIds.length() == 0) return false;
+
+    String payload = "{\"device_id\":\"";
+    payload += String(currentConfig.deviceId);
+    payload += "\",\"timestamp\":";
+    payload += String(millis());
+    payload += ",\"sample_ids\":";
+
+    if (sampleIds.startsWith("[")) {
+        payload += sampleIds;
+    } else {
+        payload += "[\"";
+        payload += sampleIds;
+        payload += "\"]";
+    }
+
+    payload += "}";
+
+    const String topic = buildTopicRoot() + "/labels/request";
+    return publishJSON(topic.c_str(), payload, 1);
+}
+
+void CloudConnector::subscribeModelUpdates() {
+    if (!mqttClient || connectionState != CLOUD_CONNECTED) return;
+
+    const String topic = buildTopicRoot() + "/models/update";
+    subscribe(topic.c_str(), 1);
+}
+
+void CloudConnector::subscribeLabelResponses() {
+    if (!mqttClient || connectionState != CLOUD_CONNECTED) return;
+
+    const String topic = buildTopicRoot() + "/labels/response";
+    subscribe(topic.c_str(), 1);
 }
 
 AWSIoTConnector::AWSIoTConnector()
