@@ -25,6 +25,7 @@ public:
     bool push(float value);
     bool isFull() const { return count >= size; }
     void clear();
+    void discardPrefix(size_t n);
 
     float* getData() { return buffer; }
     const float* getData() const { return buffer; }
@@ -64,6 +65,9 @@ public:
 
     void reset();
 
+    void advanceWindow(uint8_t axis = 0);
+    size_t getHopSize() const { return hopSize; }
+
     uint8_t getBufferFillLevel() const;
 
     const float* getBufferData(uint8_t axis = 0) const;
@@ -74,6 +78,9 @@ private:
     SignalBuffer* buffers[3];        
     Complex* fftOutput;              
     float* magnitudeSpectrum;        
+    float* windowScratch;
+    float* hanningCoefficients;
+    size_t hopSize;
     bool fftReady;                   
 
     void fft(const float* input, Complex* output, size_t n);

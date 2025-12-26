@@ -26,8 +26,24 @@ void SignalBuffer::clear() {
     memset(buffer, 0, size * sizeof(float));
 }
 
+void SignalBuffer::discardPrefix(size_t n) {
+    if (n == 0) return;
+    if (n >= count) {
+        clear();
+        return;
+    }
+
+    const size_t remaining = count - n;
+    memmove(buffer, buffer + n, remaining * sizeof(float));
+    memset(buffer + remaining, 0, (size - remaining) * sizeof(float));
+    count = remaining;
+}
+
 SignalProcessor::SignalProcessor()
-    : fftReady(false)
+    : windowScratch(nullptr)
+    , hanningCoefficients(nullptr)
+    , hopSize(WINDOW_SIZE)
+    , fftReady(false)
 {
      
     for (int i = 0; i < 3; i++) {
@@ -36,6 +52,8 @@ SignalProcessor::SignalProcessor()
 
     fftOutput = new Complex[FFT_SIZE];
     magnitudeSpectrum = new float[FFT_OUTPUT_SIZE];
+    windowScratch = new float[WINDOW_SIZE];
+    hanningCoefficients = new float[WINDOW_SIZE];
 }
 
 SignalProcessor::~SignalProcessor() {
@@ -44,11 +62,26 @@ SignalProcessor::~SignalProcessor() {
     }
     delete[] fftOutput;
     delete[] magnitudeSpectrum;
+    delete[] windowScratch;
+    delete[] hanningCoefficients;
 }
 
 bool SignalProcessor::begin() {
     DEBUG_PRINTLN("Initializing Signal Processor...");
     reset();
+
+    const size_t overlapPct = (OVERLAP_PERCENTAGE >= 100) ? 99 : OVERLAP_PERCENTAGE;
+    size_t computedHop = (WINDOW_SIZE * (100 - overlapPct)) / 100;
+    if (computedHop == 0) computedHop = 1;
+    hopSize = computedHop;
+
+    if (hanningCoefficients) {
+        for (size_t i = 0; i < WINDOW_SIZE; i++) {
+            const float window = 0.5f * (1.0f - cos(2.0f * M_PI * i / (WINDOW_SIZE - 1)));
+            hanningCoefficients[i] = window;
+        }
+    }
+
     DEBUG_PRINTLN("Signal Processor initialized");
     return true;
 }
@@ -76,8 +109,10 @@ bool SignalProcessor::performFFT(uint8_t axis) {
     float* inputData = buffers[axis]->getData();
     size_t dataSize = buffers[axis]->getSize();
 
-    float* windowedData = new float[dataSize];
-    memcpy(windowedData, inputData, dataSize * sizeof(float));
+    float* windowedData = windowScratch ? windowScratch : inputData;
+    if (windowedData != inputData) {
+        memcpy(windowedData, inputData, dataSize * sizeof(float));
+    }
     hanningWindow(windowedData, dataSize);
 
     fft(windowedData, fftOutput, dataSize);
@@ -85,8 +120,6 @@ bool SignalProcessor::performFFT(uint8_t axis) {
     for (size_t i = 0; i < FFT_OUTPUT_SIZE; i++) {
         magnitudeSpectrum[i] = fftOutput[i].magnitude();
     }
-
-    delete[] windowedData;
 
     fftReady = true;
     return true;
@@ -201,6 +234,16 @@ void SignalProcessor::reset() {
     fftReady = false;
 }
 
+void SignalProcessor::advanceWindow(uint8_t axis) {
+    if (axis >= 3) {
+        DEBUG_PRINTLN("Invalid axis");
+        return;
+    }
+
+    buffers[axis]->discardPrefix(hopSize);
+    fftReady = false;
+}
+
 uint8_t SignalProcessor::getBufferFillLevel() const {
      
     return (uint8_t)((buffers[0]->getCount() * 100) / buffers[0]->getSize());
@@ -236,7 +279,12 @@ void SignalProcessor::fft(const float* input, Complex* output, size_t n) {
 
     bitReverse(output, n);
 
-    for (size_t s = 1; s <= log2(n); s++) {
+    size_t stages = 0;
+    for (size_t m = n; m > 1; m >>= 1) {
+        stages++;
+    }
+
+    for (size_t s = 1; s <= stages; s++) {
         size_t m = 1 << s;  
         size_t m2 = m >> 1;  
 
@@ -290,6 +338,13 @@ void SignalProcessor::bitReverse(Complex* data, size_t n) {
 }
 
 void SignalProcessor::hanningWindow(float* data, size_t n) {
+    if (hanningCoefficients && n == WINDOW_SIZE) {
+        for (size_t i = 0; i < n; i++) {
+            data[i] *= hanningCoefficients[i];
+        }
+        return;
+    }
+
     for (size_t i = 0; i < n; i++) {
         float window = 0.5f * (1.0f - cos(2.0f * M_PI * i / (n - 1)));
         data[i] *= window;

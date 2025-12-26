@@ -34,7 +34,9 @@ void MultiAxisAnalyzer::addSample(float x, float y, float z) {
     procY->addSample(y, 0);
     procZ->addSample(z, 0);
 
-    sampleCount++;
+    if (sampleCount < WINDOW_SIZE) {
+        sampleCount++;
+    }
 }
 
 MultiAxisAnalysis MultiAxisAnalyzer::analyze() {
@@ -70,6 +72,12 @@ MultiAxisAnalysis MultiAxisAnalyzer::analyze() {
         procY->getBufferData(0), procZ->getBufferData(0), WINDOW_SIZE);
 
     analysis.timestamp = millis();
+
+    const size_t hop = procX ? procX->getHopSize() : WINDOW_SIZE;
+    if (procX) procX->advanceWindow(0);
+    if (procY) procY->advanceWindow(0);
+    if (procZ) procZ->advanceWindow(0);
+    sampleCount = (hop < WINDOW_SIZE) ? (WINDOW_SIZE - hop) : 0;
 
     return analysis;
 }
