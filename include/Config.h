@@ -12,10 +12,10 @@
 #define MPU6050_SCL_PIN 22
 #define MPU6050_INT_PIN 19
 
-#define SAMPLING_FREQUENCY_HZ 100     
+#define SAMPLING_FREQUENCY_HZ 100
 #define SAMPLING_PERIOD_MS (1000 / SAMPLING_FREQUENCY_HZ)
-#define WINDOW_SIZE 256               
-#define OVERLAP_PERCENTAGE 50         
+#define WINDOW_SIZE 256
+#define OVERLAP_PERCENTAGE 50
 
 #define ACCEL_RANGE_G 8
 
@@ -23,23 +23,23 @@
 #define FFT_OUTPUT_SIZE (FFT_SIZE / 2)
 
 #define BAND_1_MIN 0
-#define BAND_1_MAX 10       
+#define BAND_1_MAX 10
 #define BAND_2_MIN 10
-#define BAND_2_MAX 30       
+#define BAND_2_MAX 30
 #define BAND_3_MIN 30
-#define BAND_3_MAX 50       
+#define BAND_3_MAX 50
 
 #define NUM_TIME_FEATURES 6
 #define NUM_FREQ_FEATURES 4
 #define NUM_TOTAL_FEATURES (NUM_TIME_FEATURES + NUM_FREQ_FEATURES)
 
 enum TimeFeature {
-    FEAT_RMS = 0,            
-    FEAT_PEAK_TO_PEAK,       
-    FEAT_KURTOSIS,           
-    FEAT_SKEWNESS,           
-    FEAT_CREST_FACTOR,       
-    FEAT_VARIANCE            
+    FEAT_RMS = 0,
+    FEAT_PEAK_TO_PEAK,
+    FEAT_KURTOSIS,
+    FEAT_SKEWNESS,
+    FEAT_CREST_FACTOR,
+    FEAT_VARIANCE
 };
 
 enum FreqFeature {
@@ -52,16 +52,16 @@ enum FreqFeature {
 #define THRESHOLD_MULTIPLIER_WARNING 2.0
 #define THRESHOLD_MULTIPLIER_CRITICAL 3.0
 
-#define CALIBRATION_SAMPLES 100       
+#define CALIBRATION_SAMPLES 100
 #define CALIBRATION_DURATION_MS (CALIBRATION_SAMPLES * SAMPLING_PERIOD_MS)
 
 enum FaultType {
     FAULT_NONE = 0,
-    FAULT_IMBALANCE,         
-    FAULT_MISALIGNMENT,      
-    FAULT_BEARING,           
-    FAULT_LOOSENESS,         
-    FAULT_UNKNOWN            
+    FAULT_IMBALANCE,
+    FAULT_MISALIGNMENT,
+    FAULT_BEARING,
+    FAULT_LOOSENESS,
+    FAULT_UNKNOWN
 };
 
 enum SeverityLevel {
@@ -74,8 +74,8 @@ enum SeverityLevel {
 #define LOG_TO_FLASH false
 #define LOG_BUFFER_SIZE 100
 
-#define LOG_INTERVAL_MS 1000          
-#define ALERT_COOLDOWN_MS 5000        
+#define LOG_INTERVAL_MS 1000
+#define ALERT_COOLDOWN_MS 5000
 
 #define WIFI_ENABLED false
 #define WIFI_SSID "your_ssid"
@@ -106,8 +106,8 @@ enum SeverityLevel {
 #define CURRENT_NOMINAL 5.0f
 #define POWER_FACTOR 0.85f
 
-#define LED_STATUS_PIN 2              
-#define LED_FAULT_PIN 13              
+#define LED_STATUS_PIN 2
+#define LED_FAULT_PIN 13
 
 #define DEBUG_ENABLED true
 #define DEBUG_SERIAL Serial
@@ -123,7 +123,7 @@ enum SeverityLevel {
     #define DEBUG_PRINTF(fmt, ...)
 #endif
 
-#define USE_PSRAM false               
-#define STACK_SIZE 8192               
+#define USE_PSRAM false
+#define STACK_SIZE 8192
 
-#endif  
+#endif

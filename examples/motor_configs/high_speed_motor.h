@@ -2,10 +2,10 @@
 #define HIGH_SPEED_MOTOR_CONFIG_H
 
 #undef SAMPLING_FREQUENCY_HZ
-#define SAMPLING_FREQUENCY_HZ 400     
+#define SAMPLING_FREQUENCY_HZ 400
 
 #undef WINDOW_SIZE
-#define WINDOW_SIZE 512               
+#define WINDOW_SIZE 512
 
 #undef BAND_1_MAX
 #undef BAND_2_MIN
@@ -13,11 +13,11 @@
 #undef BAND_3_MIN
 #undef BAND_3_MAX
 
-#define BAND_1_MAX 60       
+#define BAND_1_MAX 60
 #define BAND_2_MIN 60
-#define BAND_2_MAX 150      
+#define BAND_2_MAX 150
 #define BAND_3_MIN 150
-#define BAND_3_MAX 400      
+#define BAND_3_MAX 400
 
 #undef THRESHOLD_MULTIPLIER_WARNING
 #undef THRESHOLD_MULTIPLIER_CRITICAL
@@ -33,11 +33,11 @@
 #define MOTOR_RATED_HP 10
 #define MOTOR_POLES 2
 
-#define MOTOR_FUNDAMENTAL_HZ (MOTOR_RATED_RPM / 60.0f)   
+#define MOTOR_FUNDAMENTAL_HZ (MOTOR_RATED_RPM / 60.0f)
 
 #define IMBALANCE_SENSITIVITY_MULTIPLIER 0.5f
 
 #undef ACCEL_RANGE_G
-#define ACCEL_RANGE_G 16              
+#define ACCEL_RANGE_G 16
 
-#endif  
+#endif

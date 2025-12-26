@@ -56,7 +56,6 @@ Pre-configured settings for different motor types. Include these in your main pr
 
 **Usage:**
 ```cpp
-// In src/main.cpp:
 #include "motor_configs/small_motor.h"
 ```
 
@@ -115,19 +114,15 @@ cp examples/motor_configs/small_motor.h examples/motor_configs/my_motor.h
 
 2. **Edit parameters:**
 ```cpp
-// Motor specifications
 #define MOTOR_TYPE "Custom Motor"
 #define MOTOR_RATED_RPM 2400
 #define MOTOR_RATED_HP 5
 #define MOTOR_POLES 3
 
-// Calculate fundamental frequency
-#define MOTOR_FUNDAMENTAL_HZ (MOTOR_RATED_RPM / 60.0f)  // 40 Hz
+#define MOTOR_FUNDAMENTAL_HZ (MOTOR_RATED_RPM / 60.0f)
 
-// Adjust sampling
-#define SAMPLING_FREQUENCY_HZ 150  // At least 3x fundamental
+#define SAMPLING_FREQUENCY_HZ 150
 
-// Tune thresholds based on testing
 #define THRESHOLD_MULTIPLIER_WARNING 2.0
 #define THRESHOLD_MULTIPLIER_CRITICAL 3.5
 ```
@@ -143,8 +138,7 @@ cp examples/motor_configs/small_motor.h examples/motor_configs/my_motor.h
 
 ### 1X RPM (Fundamental Frequency)
 ```cpp
-// For 1800 RPM motor:
-float freq_1x = 1800.0 / 60.0;  // = 30 Hz
+float freq_1x = 1800.0 / 60.0;
 ```
 
 ### Bearing Fault Frequencies
@@ -157,28 +151,20 @@ For a bearing with:
 - **fr** = Rotational frequency (30 Hz for 1800 RPM)
 
 ```cpp
-// Ball Pass Frequency Outer Race (BPFO)
 float bpfo = (Nb / 2.0) * fr * (1 - (Bd/Pd) * cos(phi));
-// = 3.5 * 30 = 105 Hz
 
-// Ball Pass Frequency Inner Race (BPFI)
 float bpfi = (Nb / 2.0) * fr * (1 + (Bd/Pd) * cos(phi));
-// = 4.5 * 30 = 135 Hz
 
-// Ball Spin Frequency (BSF)
 float bsf = (Pd / (2*Bd)) * fr * (1 - pow(Bd/Pd, 2) * pow(cos(phi), 2));
-// = 1.8 * 30 = 54 Hz
 
-// Fundamental Train Frequency (FTF) - Cage frequency
 float ftf = (fr / 2.0) * (1 - (Bd/Pd) * cos(phi));
-// = 0.4 * 30 = 12 Hz
 ```
 
 ### Blade Pass Frequency
 
 For a fan with 6 blades at 1800 RPM:
 ```cpp
-float bpf = (1800.0 / 60.0) * 6;  // = 180 Hz
+float bpf = (1800.0 / 60.0) * 6;
 ```
 
 ---

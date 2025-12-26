@@ -6,9 +6,9 @@
 MPU6050Driver sensor;
 SignalProcessor processor;
 
-#define PLOT_BINS 64               
-#define PLOT_INTERVAL_MS 100       
-#define PLOT_SMOOTHING 0.3         
+#define PLOT_BINS 64
+#define PLOT_INTERVAL_MS 100
+#define PLOT_SMOOTHING 0.3
 
 float smoothedSpectrum[PLOT_BINS] = {0};
 
@@ -42,7 +42,7 @@ void loop() {
                               accel.z * accel.z);
 
         if (processor.addSample(magnitude, 0)) {
-             
+
             processor.performFFT(0);
 
             if (millis() - lastPlot >= PLOT_INTERVAL_MS) {
@@ -64,7 +64,7 @@ void plotSpectrum() {
     int binSize = FFT_OUTPUT_SIZE / PLOT_BINS;
 
     for (int i = 0; i < PLOT_BINS; i++) {
-         
+
         float avg = 0;
         for (int j = 0; j < binSize; j++) {
             int idx = i * binSize + j;

@@ -5,30 +5,30 @@
 #include "Config.h"
 
 struct PerformanceMetrics {
-     
-    uint32_t loopTime;               
-    uint32_t sensorReadTime;         
-    uint32_t fftTime;                
-    uint32_t featureExtractTime;     
-    uint32_t faultDetectTime;        
 
-    float samplesPerSecond;          
-    float fftPerSecond;              
-    float detectionsPerSecond;       
+    uint32_t loopTime;
+    uint32_t sensorReadTime;
+    uint32_t fftTime;
+    uint32_t featureExtractTime;
+    uint32_t faultDetectTime;
 
-    uint32_t freeHeap;               
-    uint32_t minFreeHeap;            
-    uint32_t maxAllocHeap;           
-    uint8_t heapFragmentation;       
+    float samplesPerSecond;
+    float fftPerSecond;
+    float detectionsPerSecond;
 
-    float cpuUsage;                  
-    uint32_t maxLoopTime;            
-    uint32_t avgLoopTime;            
+    uint32_t freeHeap;
+    uint32_t minFreeHeap;
+    uint32_t maxAllocHeap;
+    uint8_t heapFragmentation;
 
-    uint32_t totalSamples;           
-    uint32_t totalFFTs;              
-    uint32_t totalDetections;        
-    uint32_t missedSamples;          
+    float cpuUsage;
+    uint32_t maxLoopTime;
+    uint32_t avgLoopTime;
+
+    uint32_t totalSamples;
+    uint32_t totalFFTs;
+    uint32_t totalDetections;
+    uint32_t missedSamples;
 
     void reset() {
         loopTime = sensorReadTime = fftTime = 0;
@@ -66,7 +66,7 @@ private:
 
 class PerformanceMonitor {
 public:
-     
+
     PerformanceMonitor();
 
     ~PerformanceMonitor();
@@ -114,7 +114,7 @@ private:
     ProfileTimer loopTimer;
 
     uint32_t lastUpdateTime;
-    uint32_t updateInterval;   
+    uint32_t updateInterval;
 
     uint32_t loopTimeSum;
     uint32_t loopTimeCount;
@@ -122,4 +122,4 @@ private:
     void calculateAverages();
 };
 
-#endif  
+#endif

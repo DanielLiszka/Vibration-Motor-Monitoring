@@ -6,7 +6,7 @@ WiFiManager::WiFiManager()
     , mqttClient(nullptr)
     , mqttPort(MQTT_PORT)
     , lastReconnectAttempt(0)
-    , reconnectInterval(5000)  
+    , reconnectInterval(5000)
 {
 }
 
@@ -124,7 +124,7 @@ void WiFiManager::disconnectMQTT() {
 }
 
 void WiFiManager::loop() {
-     
+
     if (WiFi.status() != WL_CONNECTED) {
         if (wifiStatus == WIFI_CONNECTED) {
             DEBUG_PRINTLN("WiFi connection lost");
@@ -152,7 +152,7 @@ void WiFiManager::loop() {
             }
         } else {
             mqttStatus = MQTT_STATUS_CONNECTED;
-            mqttClient->loop();  
+            mqttClient->loop();
         }
     }
 }
@@ -169,7 +169,7 @@ bool WiFiManager::publishVibration(const FeatureVector& features) {
 
 bool WiFiManager::publishFault(const FaultResult& fault) {
     String payload = faultToJSON(fault);
-    return publish(MQTT_TOPIC_FAULT, payload, true);  
+    return publish(MQTT_TOPIC_FAULT, payload, true);
 }
 
 bool WiFiManager::publishFeatures(const FeatureVector& features) {

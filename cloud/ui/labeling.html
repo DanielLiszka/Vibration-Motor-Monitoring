@@ -390,7 +390,7 @@
                 html || '<li class="empty-state">No labels yet</li>';
         }
 
-        // Keyboard shortcuts
+
         document.addEventListener('keydown', (e) => {
             if (e.key >= '1' && e.key <= '5') {
                 selectLabel(parseInt(e.key) - 1);
@@ -403,7 +403,7 @@
             }
         });
 
-        // Initialize
+
         loadStats();
         setInterval(loadStats, 30000);
     </script>

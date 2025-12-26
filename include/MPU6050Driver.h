@@ -8,15 +8,15 @@
 #include "Config.h"
 
 struct AccelData {
-    float x;         
-    float y;         
-    float z;         
-    uint32_t timestamp;  
+    float x;
+    float y;
+    float z;
+    uint32_t timestamp;
 };
 
 class MPU6050Driver {
 public:
-     
+
     MPU6050Driver();
 
     ~MPU6050Driver();
@@ -44,16 +44,16 @@ public:
     String getLastError() const { return lastError; }
 
 private:
-    Adafruit_MPU6050 mpu;            
+    Adafruit_MPU6050 mpu;
 
     float offsetX;
     float offsetY;
     float offsetZ;
 
-    bool initialized;                
-    String lastError;                
+    bool initialized;
+    String lastError;
 
     void applyCalibration(AccelData& data);
 };
 
-#endif  
+#endif

@@ -36,18 +36,15 @@ This guide covers deploying the Motor Vibration Fault Detection System in a prod
 ### 1. Update Config.h
 
 ```cpp
-// Disable debug output for performance
 #define DEBUG_ENABLED false
 
-// Set appropriate log intervals
-#define LOG_INTERVAL_MS 5000      // Log every 5 seconds
-#define ALERT_COOLDOWN_MS 60000   // Alert cooldown: 1 minute
+#define LOG_INTERVAL_MS 5000
+#define ALERT_COOLDOWN_MS 60000
 
-// Enable features as needed
-#define WIFI_ENABLED true         // Set false if no network
-#define MQTT_ENABLED true         // Set false if local only
-#define LOG_TO_SERIAL true        // Keep for troubleshooting
-#define LOG_TO_FLASH false        // Enable when flash logging implemented
+#define WIFI_ENABLED true
+#define MQTT_ENABLED true
+#define LOG_TO_SERIAL true
+#define LOG_TO_FLASH false
 ```
 
 ### 2. Set Motor Configuration
@@ -55,8 +52,7 @@ This guide covers deploying the Motor Vibration Fault Detection System in a prod
 Include appropriate motor config:
 
 ```cpp
-// In src/main.cpp, add BEFORE other includes:
-#include "motor_configs/large_motor.h"  // Or your motor type
+#include "motor_configs/large_motor.h"
 ```
 
 ### 3. WiFi Security
@@ -65,13 +61,11 @@ Include appropriate motor config:
 
 Option A: Use separate credentials file
 ```cpp
-// Create include/credentials.h (add to .gitignore):
 #define WIFI_SSID "ProductionNetwork"
 #define WIFI_PASSWORD "SecurePassword123"
 #define MQTT_USER "motor_monitor"
 #define MQTT_PASSWORD "MqttPass456"
 
-// In Config.h:
 #include "credentials.h"
 ```
 
@@ -333,8 +327,7 @@ For monitoring multiple motors:
 
 **Configuration:**
 ```cpp
-// Give each device unique ID:
-#define DEVICE_NAME "MotorVibMonitor_01"  // Increment for each
+#define DEVICE_NAME "MotorVibMonitor_01"
 #define MQTT_CLIENT_ID DEVICE_NAME
 ```
 
@@ -401,11 +394,9 @@ docker run -p 8086:8086 influxdb
 
 2. **MQTT Security**
    ```cpp
-   // Use TLS for MQTT (requires cert)
    #define MQTT_USE_TLS true
-   #define MQTT_PORT 8883  // TLS port
+   #define MQTT_PORT 8883
 
-   // Always use authentication
    #define MQTT_USER "motor_monitor"
    #define MQTT_PASSWORD "SecurePassword"
    ```
@@ -458,28 +449,22 @@ cp include/Config.h backups/config_motor01_2025-01-01.h
 ### For Resource-Constrained Deployments
 
 ```cpp
-// Reduce memory usage
-#define WINDOW_SIZE 128           // Smaller FFT
-#define CALIBRATION_SAMPLES 50    // Faster calibration
+#define WINDOW_SIZE 128
+#define CALIBRATION_SAMPLES 50
 
-// Reduce processing
-#define SAMPLING_FREQUENCY_HZ 50  // Lower rate
+#define SAMPLING_FREQUENCY_HZ 50
 
-// Disable features
-#define WIFI_ENABLED false        // Local only
+#define WIFI_ENABLED false
 ```
 
 ### For Maximum Accuracy
 
 ```cpp
-// Increase resolution
 #define WINDOW_SIZE 512
 #define SAMPLING_FREQUENCY_HZ 200
 
-// More calibration
 #define CALIBRATION_SAMPLES 500
 
-// Stricter thresholds
 #define THRESHOLD_MULTIPLIER_WARNING 1.5
 ```
 

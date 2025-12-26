@@ -2,7 +2,7 @@
 
 PerformanceMonitor::PerformanceMonitor()
     : lastUpdateTime(0)
-    , updateInterval(1000)  
+    , updateInterval(1000)
     , loopTimeSum(0)
     , loopTimeCount(0)
 {
@@ -79,7 +79,7 @@ void PerformanceMonitor::updateMemoryStats() {
 }
 
 void PerformanceMonitor::updateThroughput() {
-     
+
     float intervalSec = updateInterval / 1000.0f;
 
     static uint32_t lastTotalSamples = 0;
@@ -188,8 +188,8 @@ void PerformanceMonitor::reset() {
 }
 
 bool PerformanceMonitor::isRealTimeCapable() const {
-     
-    float targetPeriod = 1000000.0f / SAMPLING_FREQUENCY_HZ;  
+
+    float targetPeriod = 1000000.0f / SAMPLING_FREQUENCY_HZ;
 
     return (metrics.avgLoopTime < targetPeriod) && (metrics.cpuUsage < 90.0f);
 }

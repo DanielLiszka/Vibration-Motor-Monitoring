@@ -17,14 +17,14 @@ struct LogEntry {
     String toCSV() const;
 };
 
-// Training sample for continuous learning
+
 struct TrainingSample {
     uint32_t timestamp;
     float features[16];
     uint8_t numFeatures;
     uint8_t label;
     float confidence;
-    uint8_t labelSource;  // 0=auto, 1=user, 2=cloud
+    uint8_t labelSource;
     bool uploaded;
 };
 
@@ -32,7 +32,7 @@ struct TrainingSample {
 
 class DataLogger {
 public:
-     
+
     DataLogger();
 
     ~DataLogger();
@@ -61,7 +61,7 @@ public:
 
     bool shouldLog();
 
-    // Training sample management for continuous learning
+
     bool logTrainingSample(const float* features, uint8_t numFeatures,
                            uint8_t label, float confidence, uint8_t labelSource);
     size_t getTrainingSampleCount() const { return trainingSampleCount; }
@@ -80,7 +80,7 @@ private:
     uint32_t lastAlertTime;
     uint32_t logInterval;
 
-    // Training sample storage for continuous learning
+
     TrainingSample trainingSamples[MAX_TRAINING_SAMPLES];
     size_t trainingSampleCount;
     size_t trainingSampleHead;
@@ -90,4 +90,4 @@ private:
     bool canSendAlert();
 };
 
-#endif  
+#endif

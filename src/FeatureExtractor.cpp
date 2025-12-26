@@ -48,7 +48,7 @@ bool FeatureExtractor::extractFreqFeatures(const float* spectrum, size_t length,
 bool FeatureExtractor::extractAllFeatures(const float* signal, size_t signalLength,
                                          const float* spectrum, size_t spectrumLength,
                                          SignalProcessor* processor, FeatureVector& features) {
-     
+
     if (!extractTimeFeatures(signal, signalLength, features)) {
         return false;
     }

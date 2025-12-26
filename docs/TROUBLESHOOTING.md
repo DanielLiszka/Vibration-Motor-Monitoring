@@ -24,9 +24,6 @@ Verify connections:
 
 ✓ **I2C Address**
 ```cpp
-// The MPU6050 can have two addresses: 0x68 (default) or 0x69
-// If AD0 pin is HIGH, address is 0x69
-// Try running I2C scanner to detect address
 ```
 
 ✓ **Power Supply**
@@ -41,7 +38,6 @@ Verify connections:
 
 **Diagnostic Commands:**
 ```cpp
-// Add to setup() for debugging:
 Wire.begin(21, 22);
 Serial.println("Scanning I2C bus...");
 for (uint8_t addr = 1; addr < 127; addr++) {
@@ -88,8 +84,7 @@ for (uint8_t addr = 1; addr < 127; addr++) {
 
 ✓ **Filtering**
 ```cpp
-// Try increasing low-pass filter in Config.h
-#define MPU6050_BANDWIDTH MPU6050_BAND_10_HZ  // Lower = more filtering
+#define MPU6050_BANDWIDTH MPU6050_BAND_10_HZ
 ```
 
 ---
@@ -113,19 +108,15 @@ for (uint8_t addr = 1; addr < 127; addr++) {
 
 ✓ **Memory Issues**
 ```cpp
-// Check free heap in loop:
 if (ESP.getFreeHeap() < 10000) {
     Serial.println("WARNING: Low memory!");
 }
 
-// Reduce buffer sizes if needed:
-#define WINDOW_SIZE 128  // Instead of 256
+#define WINDOW_SIZE 128
 ```
 
 ✓ **Stack Overflow**
 ```cpp
-// Reduce recursion or large local arrays
-// Use heap allocation for large buffers
 ```
 
 ---
@@ -143,9 +134,8 @@ if (ESP.getFreeHeap() < 10000) {
 
 ✓ **Credentials**
 ```cpp
-// Double-check SSID and password in Config.h
-#define WIFI_SSID "YourSSID"        // Case sensitive!
-#define WIFI_PASSWORD "YourPassword" // Must be exact
+#define WIFI_SSID "YourSSID"
+#define WIFI_PASSWORD "YourPassword"
 ```
 
 ✓ **Network Type**
@@ -157,15 +147,12 @@ if (ESP.getFreeHeap() < 10000) {
 
 ✓ **Signal Strength**
 ```cpp
-// Check signal strength:
 Serial.println(WiFi.RSSI());
-// Should be > -80 dBm for reliable connection
 ```
 
 ✓ **Disable WiFi (Temporary)**
 ```cpp
-// In Config.h:
-#define WIFI_ENABLED false  // Disable WiFi to test
+#define WIFI_ENABLED false
 ```
 
 ---
@@ -193,11 +180,9 @@ rc = 5: Not authorized
 
 ✓ **Broker Settings**
 ```cpp
-// Try public broker for testing:
 #define MQTT_BROKER "test.mosquitto.org"
 #define MQTT_PORT 1883
 
-// Check if broker requires authentication
 #define MQTT_USER ""
 #define MQTT_PASSWORD ""
 ```
@@ -231,9 +216,8 @@ rc = 5: Not authorized
 
 ✓ **Adjust Thresholds**
 ```cpp
-// In Config.h, increase threshold multipliers:
-#define THRESHOLD_MULTIPLIER_WARNING 3.0   // Instead of 2.0
-#define THRESHOLD_MULTIPLIER_CRITICAL 5.0  // Instead of 3.0
+#define THRESHOLD_MULTIPLIER_WARNING 3.0
+#define THRESHOLD_MULTIPLIER_CRITICAL 5.0
 ```
 
 ✓ **Check Mounting**
@@ -263,8 +247,7 @@ rc = 5: Not authorized
 
 ✓ **Increase Sensitivity**
 ```cpp
-// Lower thresholds:
-#define THRESHOLD_MULTIPLIER_WARNING 1.5   // More sensitive
+#define THRESHOLD_MULTIPLIER_WARNING 1.5
 #define THRESHOLD_MULTIPLIER_CRITICAL 2.0
 ```
 
@@ -284,11 +267,9 @@ rc = 5: Not authorized
 
 ✓ **Check Frequency Bands**
 ```cpp
-// Adjust bands for your motor speed:
-// For 1800 RPM motor (30 Hz fundamental):
-#define BAND_1_MAX 10   // Imbalance, misalignment
-#define BAND_2_MAX 30   // Bearing faults
-#define BAND_3_MAX 50   // High frequency
+#define BAND_1_MAX 10
+#define BAND_2_MAX 30
+#define BAND_3_MAX 50
 ```
 
 ---
@@ -304,24 +285,23 @@ rc = 5: Not authorized
 
 ✓ **Reduce Sampling Rate**
 ```cpp
-#define SAMPLING_FREQUENCY_HZ 50  // Instead of 100
+#define SAMPLING_FREQUENCY_HZ 50
 ```
 
 ✓ **Smaller FFT Window**
 ```cpp
-#define WINDOW_SIZE 128  // Instead of 256
+#define WINDOW_SIZE 128
 ```
 
 ✓ **Disable Features**
 ```cpp
 #define WIFI_ENABLED false
 #define MQTT_ENABLED false
-#define LOG_TO_SERIAL false  // Reduces serial overhead
+#define LOG_TO_SERIAL false
 ```
 
 ✓ **Optimize Code**
 ```cpp
-// Reduce debug output:
 #define DEBUG_ENABLED false
 ```
 
@@ -359,9 +339,8 @@ pio platform update
 **Add to main loop for diagnostics:**
 
 ```cpp
-// In loop(), periodically print stats:
 static uint32_t lastHealthCheck = 0;
-if (millis() - lastHealthCheck > 10000) {  // Every 10 seconds
+if (millis() - lastHealthCheck > 10000) {
     Serial.println("\n=== SYSTEM HEALTH ===");
     Serial.printf("Free Heap: %d bytes\n", ESP.getFreeHeap());
     Serial.printf("Min Free Heap: %d bytes\n", ESP.getMinFreeHeap());
@@ -397,22 +376,20 @@ Add to `main.cpp` for interactive debugging:
 
 ```cpp
 void loop() {
-    // Check for serial commands
     if (Serial.available()) {
         char cmd = Serial.read();
         switch(cmd) {
-            case 'r':  // Reset calibration
+            case 'r':
                 faultDetect.reset();
                 Serial.println("Calibration reset");
                 break;
-            case 's':  // Print status
+            case 's':
                 printSystemStatus();
                 break;
-            case 'm':  // Memory info
+            case 'm':
                 Serial.printf("Free: %d bytes\n", ESP.getFreeHeap());
                 break;
-            case 'f':  // Force FFT display
-                // Display spectrum
+            case 'f':
                 break;
         }
     }
@@ -453,7 +430,6 @@ pio device monitor > debug.log
 ### Reset to Factory Settings
 
 ```cpp
-// In setup(), force recalibration:
 faultDetect.startCalibration(CALIBRATION_SAMPLES);
 ```
 

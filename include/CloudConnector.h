@@ -88,7 +88,7 @@ public:
     void publishAlert(const String& alertJson);
     void publishHeartbeat();
 
-    // Continuous learning methods
+
     bool uploadTrainingData(const String& samplesJson);
     bool checkModelUpdate(String& availableVersion);
     bool downloadModel(const char* modelUrl, uint8_t* buffer, size_t maxSize, size_t& downloadedSize);

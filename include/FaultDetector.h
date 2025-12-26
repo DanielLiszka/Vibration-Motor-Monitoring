@@ -7,12 +7,12 @@
 #include "FeatureExtractor.h"
 
 struct FaultResult {
-    FaultType type;              
-    SeverityLevel severity;      
-    float confidence;            
-    float anomalyScore;          
-    String description;          
-    uint32_t timestamp;          
+    FaultType type;
+    SeverityLevel severity;
+    float confidence;
+    float anomalyScore;
+    String description;
+    uint32_t timestamp;
 
     void reset() {
         type = FAULT_NONE;
@@ -76,7 +76,7 @@ struct BaselineStats {
 
 class FaultDetector {
 public:
-     
+
     FaultDetector();
 
     ~FaultDetector();
@@ -108,9 +108,9 @@ public:
     bool loadBaseline();
 
 private:
-    BaselineStats baseline;          
-    float warningThreshold;          
-    float criticalThreshold;         
+    BaselineStats baseline;
+    float warningThreshold;
+    float criticalThreshold;
 
     bool calibrating;
     uint32_t calibrationTarget;
@@ -133,4 +133,4 @@ private:
     bool checkLooseness(const FeatureVector& features);
 };
 
-#endif  
+#endif

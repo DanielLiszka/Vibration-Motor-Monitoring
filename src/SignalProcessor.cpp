@@ -16,7 +16,7 @@ SignalBuffer::~SignalBuffer() {
 bool SignalBuffer::push(float value) {
     if (count < size) {
         buffer[count++] = value;
-        return (count == size);  
+        return (count == size);
     }
     return false;
 }
@@ -45,7 +45,7 @@ SignalProcessor::SignalProcessor()
     , hopSize(WINDOW_SIZE)
     , fftReady(false)
 {
-     
+
     for (int i = 0; i < 3; i++) {
         buffers[i] = new SignalBuffer(WINDOW_SIZE);
     }
@@ -177,7 +177,7 @@ float SignalProcessor::getDominantFrequency() {
 }
 
 float SignalProcessor::getFrequencyAtBin(size_t bin) {
-     
+
     float freqResolution = (float)SAMPLING_FREQUENCY_HZ / (float)FFT_SIZE;
     return bin * freqResolution;
 }
@@ -245,7 +245,7 @@ void SignalProcessor::advanceWindow(uint8_t axis) {
 }
 
 uint8_t SignalProcessor::getBufferFillLevel() const {
-     
+
     return (uint8_t)((buffers[0]->getCount() * 100) / buffers[0]->getSize());
 }
 
@@ -271,7 +271,7 @@ size_t SignalProcessor::getBufferSize(uint8_t axis) const {
 }
 
 void SignalProcessor::fft(const float* input, Complex* output, size_t n) {
-     
+
     for (size_t i = 0; i < n; i++) {
         output[i].real = input[i];
         output[i].imag = 0.0f;
@@ -285,8 +285,8 @@ void SignalProcessor::fft(const float* input, Complex* output, size_t n) {
     }
 
     for (size_t s = 1; s <= stages; s++) {
-        size_t m = 1 << s;  
-        size_t m2 = m >> 1;  
+        size_t m = 1 << s;
+        size_t m2 = m >> 1;
 
         Complex w(1.0f, 0.0f);
         float angle = -M_PI / m2;
@@ -294,7 +294,7 @@ void SignalProcessor::fft(const float* input, Complex* output, size_t n) {
 
         for (size_t j = 0; j < m2; j++) {
             for (size_t k = j; k < n; k += m) {
-                 
+
                 size_t t_idx = k + m2;
 
                 Complex t(
@@ -322,7 +322,7 @@ void SignalProcessor::bitReverse(Complex* data, size_t n) {
     size_t j = 0;
     for (size_t i = 0; i < n - 1; i++) {
         if (i < j) {
-             
+
             Complex temp = data[i];
             data[i] = data[j];
             data[j] = temp;

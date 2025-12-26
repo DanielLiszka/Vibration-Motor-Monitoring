@@ -90,7 +90,7 @@ public:
     bool restoreModel(const char* name, const char* backupFilename);
     bool deleteModelFile(const char* name);
 
-    // Continuous learning model management
+
     bool hotSwapModel(const char* newModelData, size_t size, const char* version);
     bool rollbackToPreviousModel();
     const char* getCurrentModelVersion() const;
@@ -116,7 +116,7 @@ private:
     bool autoLoadEnabled;
     bool validationEnabled;
 
-    // Continuous learning state
+
     char currentModelVersion[MODEL_VERSION_MAX_LEN];
     char previousModelVersion[MODEL_VERSION_MAX_LEN];
     float minAccuracyForSwap;

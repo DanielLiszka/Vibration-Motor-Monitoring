@@ -38,7 +38,7 @@ void loop() {
     static uint32_t sampleCount = 0;
 
     if (millis() - lastPrint < 100) {
-        return;  
+        return;
     }
     lastPrint = millis();
 

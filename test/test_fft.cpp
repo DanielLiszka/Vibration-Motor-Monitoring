@@ -11,11 +11,11 @@ void generateSineWave(float* buffer, size_t length, float frequency, float ampli
 }
 
 void generateMixedSignal(float* buffer, size_t length, float sampleRate) {
-     
+
     for (size_t i = 0; i < length; i++) {
-        buffer[i] = 2.0 * sin(2.0 * PI * 5.0 * i / sampleRate) +     
-                   1.5 * sin(2.0 * PI * 15.0 * i / sampleRate) +    
-                   1.0 * sin(2.0 * PI * 35.0 * i / sampleRate);     
+        buffer[i] = 2.0 * sin(2.0 * PI * 5.0 * i / sampleRate) +
+                   1.5 * sin(2.0 * PI * 15.0 * i / sampleRate) +
+                   1.0 * sin(2.0 * PI * 35.0 * i / sampleRate);
     }
 }
 
@@ -34,7 +34,7 @@ void setup() {
 
     Serial.println("Test 1: Single Frequency Detection");
     Serial.println("──────────────────────────────────");
-    testSingleFrequency(10.0, 2.0);  
+    testSingleFrequency(10.0, 2.0);
 
     Serial.println("\nTest 2: Multiple Frequencies");
     Serial.println("──────────────────────────────────");
@@ -94,7 +94,7 @@ void testMixedFrequencies() {
 
     Serial.println("\nSpectral peaks:");
     for (size_t i = 1; i < FFT_OUTPUT_SIZE - 1; i++) {
-         
+
         if (spectrum[i] > spectrum[i-1] && spectrum[i] > spectrum[i+1] && spectrum[i] > 10.0) {
             float freq = processor.getFrequencyAtBin(i);
             Serial.printf("  Peak at %.1f Hz (magnitude: %.2f)\n", freq, spectrum[i]);
@@ -123,7 +123,7 @@ void benchmarkFFT() {
     generateSineWave(testSignal, WINDOW_SIZE, 20.0, 1.0, SAMPLING_FREQUENCY_HZ);
 
     for (int i = 0; i < iterations; i++) {
-         
+
         processor.reset();
         for (size_t j = 0; j < WINDOW_SIZE; j++) {
             processor.addSample(testSignal[j], 0);
@@ -141,8 +141,8 @@ void benchmarkFFT() {
     Serial.printf("  Average time: %lu µs\n", totalTime / iterations);
     Serial.printf("  Max throughput: %.2f FFT/sec\n", 1000000.0 / (totalTime / (float)iterations));
 
-    float windowDuration = (WINDOW_SIZE * 1000.0) / SAMPLING_FREQUENCY_HZ;  
-    float fftDuration = (totalTime / iterations) / 1000.0;  
+    float windowDuration = (WINDOW_SIZE * 1000.0) / SAMPLING_FREQUENCY_HZ;
+    float fftDuration = (totalTime / iterations) / 1000.0;
     Serial.printf("  Window duration: %.2f ms\n", windowDuration);
     Serial.printf("  FFT duration: %.2f ms\n", fftDuration);
     Serial.printf("  CPU usage: %.1f%%\n", (fftDuration / windowDuration) * 100.0);
@@ -155,6 +155,6 @@ void benchmarkFFT() {
 }
 
 void loop() {
-     
+
     delay(10000);
 }

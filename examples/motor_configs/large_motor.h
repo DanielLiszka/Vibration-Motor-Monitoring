@@ -2,10 +2,10 @@
 #define LARGE_MOTOR_CONFIG_H
 
 #undef SAMPLING_FREQUENCY_HZ
-#define SAMPLING_FREQUENCY_HZ 200     
+#define SAMPLING_FREQUENCY_HZ 200
 
 #undef WINDOW_SIZE
-#define WINDOW_SIZE 512               
+#define WINDOW_SIZE 512
 
 #undef BAND_1_MAX
 #undef BAND_2_MIN
@@ -13,16 +13,16 @@
 #undef BAND_3_MIN
 #undef BAND_3_MAX
 
-#define BAND_1_MAX 30       
+#define BAND_1_MAX 30
 #define BAND_2_MIN 30
-#define BAND_2_MAX 80       
+#define BAND_2_MAX 80
 #define BAND_3_MIN 80
-#define BAND_3_MAX 200      
+#define BAND_3_MAX 200
 
 #undef THRESHOLD_MULTIPLIER_WARNING
 #undef THRESHOLD_MULTIPLIER_CRITICAL
 
-#define THRESHOLD_MULTIPLIER_WARNING 2.5     
+#define THRESHOLD_MULTIPLIER_WARNING 2.5
 #define THRESHOLD_MULTIPLIER_CRITICAL 4.0
 
 #undef CALIBRATION_SAMPLES
@@ -33,11 +33,11 @@
 #define MOTOR_RATED_HP 50
 #define MOTOR_POLES 4
 
-#define MOTOR_FUNDAMENTAL_HZ (MOTOR_RATED_RPM / 60.0f)   
+#define MOTOR_FUNDAMENTAL_HZ (MOTOR_RATED_RPM / 60.0f)
 
-#define BEARING_BPFO_MULT 3.5f        
-#define BEARING_BPFI_MULT 4.5f        
-#define BEARING_BSF_MULT 1.8f         
-#define BEARING_FTF_MULT 0.4f         
+#define BEARING_BPFO_MULT 3.5f
+#define BEARING_BPFI_MULT 4.5f
+#define BEARING_BSF_MULT 1.8f
+#define BEARING_FTF_MULT 0.4f
 
-#endif  
+#endif

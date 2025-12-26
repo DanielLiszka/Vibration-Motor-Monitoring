@@ -71,10 +71,10 @@ bool FaultDetector::addCalibrationSample(const FeatureVector& features) {
 
     if (calibrationCount >= calibrationTarget) {
         finalizeCalibration();
-        return true;  
+        return true;
     }
 
-    return false;  
+    return false;
 }
 
 void FaultDetector::finalizeCalibration() {
@@ -86,7 +86,7 @@ void FaultDetector::finalizeCalibration() {
         float variance = (calibrationSumSquares[i] / calibrationCount)
                        - (baseline.mean[i] * baseline.mean[i]);
 
-        baseline.stdDev[i] = sqrt(fabs(variance));  
+        baseline.stdDev[i] = sqrt(fabs(variance));
 
         if (baseline.stdDev[i] < 0.0001f) {
             baseline.stdDev[i] = 0.0001f;
@@ -130,17 +130,17 @@ bool FaultDetector::detectFault(const FeatureVector& features, FaultResult& resu
 
     if (result.severity != SEVERITY_NORMAL) {
         classifyFault(features, result);
-        return true;  
+        return true;
     }
 
     result.type = FAULT_NONE;
     result.description = "Normal operation";
     result.confidence = 1.0f;
-    return false;  
+    return false;
 }
 
 float FaultDetector::calculateAnomalyScore(const FeatureVector& features) {
-     
+
     float featureArray[NUM_TOTAL_FEATURES];
     features.toArray(featureArray);
 
@@ -155,7 +155,7 @@ float FaultDetector::calculateAnomalyScore(const FeatureVector& features) {
 }
 
 void FaultDetector::classifyFault(const FeatureVector& features, FaultResult& result) {
-     
+
     result.type = classifyByRules(features);
 
     result.confidence = min(result.anomalyScore / 10.0f, 1.0f);
@@ -240,7 +240,7 @@ float FaultDetector::calculateZScore(float value, int featureIndex) {
 }
 
 FaultType FaultDetector::classifyByRules(const FeatureVector& features) {
-     
+
     if (checkBearing(features)) {
         return FAULT_BEARING;
     }
@@ -261,7 +261,7 @@ FaultType FaultDetector::classifyByRules(const FeatureVector& features) {
 }
 
 bool FaultDetector::checkImbalance(const FeatureVector& features) {
-     
+
     bool highLowFreq = (features.dominantFrequency >= BAND_1_MIN &&
                        features.dominantFrequency <= BAND_1_MAX);
 
@@ -273,7 +273,7 @@ bool FaultDetector::checkImbalance(const FeatureVector& features) {
 }
 
 bool FaultDetector::checkMisalignment(const FeatureVector& features) {
-     
+
     bool moderateFreq = (features.dominantFrequency > 10.0f &&
                         features.dominantFrequency < 25.0f);
 
@@ -283,7 +283,7 @@ bool FaultDetector::checkMisalignment(const FeatureVector& features) {
 }
 
 bool FaultDetector::checkBearing(const FeatureVector& features) {
-     
+
     bool highFreq = (features.dominantFrequency >= BAND_3_MIN);
 
     bool highKurtosis = (features.kurtosis > 3.0f);
@@ -295,11 +295,11 @@ bool FaultDetector::checkBearing(const FeatureVector& features) {
     int score = (highFreq ? 1 : 0) + (highKurtosis ? 1 : 0) +
                 (highCrestFactor ? 1 : 0) + (lowBandPowerRatio ? 1 : 0);
 
-    return score >= 2;  
+    return score >= 2;
 }
 
 bool FaultDetector::checkLooseness(const FeatureVector& features) {
-     
+
     bool highVariance = (calculateZScore(features.variance, FEAT_VARIANCE) > 2.5f);
 
     bool highSpectralSpread = (features.spectralSpread > 15.0f);

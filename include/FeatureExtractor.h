@@ -6,20 +6,20 @@
 #include "SignalProcessor.h"
 
 struct FeatureVector {
-     
-    float rms;                   
-    float peakToPeak;            
-    float kurtosis;              
-    float skewness;              
-    float crestFactor;           
-    float variance;              
 
-    float spectralCentroid;      
-    float spectralSpread;        
-    float bandPowerRatio;        
-    float dominantFrequency;     
+    float rms;
+    float peakToPeak;
+    float kurtosis;
+    float skewness;
+    float crestFactor;
+    float variance;
 
-    uint32_t timestamp;          
+    float spectralCentroid;
+    float spectralSpread;
+    float bandPowerRatio;
+    float dominantFrequency;
+
+    uint32_t timestamp;
 
     void reset() {
         rms = peakToPeak = kurtosis = skewness = 0.0f;
@@ -58,7 +58,7 @@ struct FeatureVector {
 
 class FeatureExtractor {
 public:
-     
+
     FeatureExtractor();
 
     ~FeatureExtractor();
@@ -95,7 +95,7 @@ public:
                                         SignalProcessor* processor, float centroid);
 
 private:
-     
+
 };
 
-#endif  
+#endif

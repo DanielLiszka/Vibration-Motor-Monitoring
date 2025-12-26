@@ -128,11 +128,10 @@ AccelData accel;
 while (true) {
     sensor.readAcceleration(accel);
     if (proc.addSample(accel.x, 0)) {
-        // Buffer full, ready to process
         proc.performFFT(0);
         break;
     }
-    delay(10); // 100 Hz sampling
+    delay(10);
 }
 ```
 
@@ -242,7 +241,7 @@ static float calculateCrestFactor(const float* signal, size_t length)
 
 **Example**:
 ```cpp
-float signal[256] = { /* data */ };
+float signal[256] = {  };
 float rms = FeatureExtractor::calculateRMS(signal, 256);
 float kurtosis = FeatureExtractor::calculateKurtosis(signal, 256);
 ```
@@ -293,7 +292,6 @@ FaultDetector detector;
 detector.startCalibration(100);
 
 for (int i = 0; i < 100; i++) {
-    // Extract features...
     FeatureVector features;
 
     if (detector.addCalibrationSample(features)) {
@@ -433,7 +431,6 @@ WiFiManager wifi;
 wifi.begin();
 
 FaultResult fault;
-// ... detect fault ...
 
 if (wifi.isMQTTConnected()) {
     wifi.publishFault(fault);
@@ -456,10 +453,10 @@ Maintain WiFi/MQTT connections. Call this regularly in main loop.
 
 ```cpp
 struct AccelData {
-    float x;              // X-axis acceleration (m/s²)
-    float y;              // Y-axis acceleration (m/s²)
-    float z;              // Z-axis acceleration (m/s²)
-    uint32_t timestamp;   // Timestamp in milliseconds
+    float x;
+    float y;
+    float z;
+    uint32_t timestamp;
 };
 ```
 
@@ -467,7 +464,6 @@ struct AccelData {
 
 ```cpp
 struct FeatureVector {
-    // Time-domain features
     float rms;
     float peakToPeak;
     float kurtosis;
@@ -475,7 +471,6 @@ struct FeatureVector {
     float crestFactor;
     float variance;
 
-    // Frequency-domain features
     float spectralCentroid;
     float spectralSpread;
     float bandPowerRatio;
@@ -492,12 +487,12 @@ struct FeatureVector {
 
 ```cpp
 struct FaultResult {
-    FaultType type;           // Detected fault type
-    SeverityLevel severity;   // Severity level
-    float confidence;         // Confidence score (0.0 - 1.0)
-    float anomalyScore;       // Anomaly score
-    String description;       // Human-readable description
-    uint32_t timestamp;       // Detection timestamp
+    FaultType type;
+    SeverityLevel severity;
+    float confidence;
+    float anomalyScore;
+    String description;
+    uint32_t timestamp;
 
     void print() const;
     const char* getFaultTypeName() const;
@@ -531,17 +526,14 @@ enum SeverityLevel {
 All defined in `include/Config.h`:
 
 ```cpp
-// Sampling
 #define SAMPLING_FREQUENCY_HZ 100
 #define WINDOW_SIZE 256
 #define FFT_SIZE WINDOW_SIZE
 
-// Detection
 #define THRESHOLD_MULTIPLIER_WARNING 2.0
 #define THRESHOLD_MULTIPLIER_CRITICAL 3.0
 #define CALIBRATION_SAMPLES 100
 
-// Features
 #define NUM_TIME_FEATURES 6
 #define NUM_FREQ_FEATURES 4
 #define NUM_TOTAL_FEATURES 10

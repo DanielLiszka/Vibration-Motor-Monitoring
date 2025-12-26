@@ -69,18 +69,15 @@ code .
 Open `include/Config.h` and modify these settings:
 
 ```cpp
-// WiFi Settings (if using WiFi)
 #define WIFI_SSID "YourNetworkName"
 #define WIFI_PASSWORD "YourPassword"
 
-// MQTT Settings (if using MQTT)
 #define MQTT_BROKER "your.mqtt.broker.com"
 #define MQTT_PORT 1883
 
-// Enable/Disable Features
-#define WIFI_ENABLED false   // Enable if using WiFi
-#define MQTT_ENABLED false   // Enable if using MQTT
-#define DEBUG_ENABLED true   // Set to false to reduce serial output
+#define WIFI_ENABLED false
+#define MQTT_ENABLED false
+#define DEBUG_ENABLED true
 ```
 
 #### Adjust Sampling Parameters (Optional)
@@ -88,11 +85,9 @@ Open `include/Config.h` and modify these settings:
 For different motors, you may need to adjust:
 
 ```cpp
-// Sampling rate (higher for faster motors)
 #define SAMPLING_FREQUENCY_HZ 100
 
-// Detection sensitivity
-#define THRESHOLD_MULTIPLIER_WARNING 2.0   // Lower = more sensitive
+#define THRESHOLD_MULTIPLIER_WARNING 2.0
 #define THRESHOLD_MULTIPLIER_CRITICAL 3.0
 ```
 
@@ -303,7 +298,7 @@ mosquitto -v
 
 Update Config.h:
 ```cpp
-#define MQTT_BROKER "192.168.1.100"  // Your computer's IP
+#define MQTT_BROKER "192.168.1.100"
 #define MQTT_PORT 1883
 ```
 

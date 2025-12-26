@@ -24,7 +24,7 @@ enum MQTTStatus {
 
 class WiFiManager {
 public:
-     
+
     WiFiManager();
 
     ~WiFiManager();
@@ -91,4 +91,4 @@ private:
     String faultToJSON(const FaultResult& fault);
 };
 
-#endif  
+#endif

@@ -40,7 +40,7 @@ private:
 
 class SignalProcessor {
 public:
-     
+
     SignalProcessor();
 
     ~SignalProcessor();
@@ -75,13 +75,13 @@ public:
     size_t getBufferSize(uint8_t axis = 0) const;
 
 private:
-    SignalBuffer* buffers[3];        
-    Complex* fftOutput;              
-    float* magnitudeSpectrum;        
+    SignalBuffer* buffers[3];
+    Complex* fftOutput;
+    float* magnitudeSpectrum;
     float* windowScratch;
     float* hanningCoefficients;
     size_t hopSize;
-    bool fftReady;                   
+    bool fftReady;
 
     void fft(const float* input, Complex* output, size_t n);
 
@@ -96,4 +96,4 @@ private:
     size_t nextPowerOfTwo(size_t n);
 };
 
-#endif  
+#endif

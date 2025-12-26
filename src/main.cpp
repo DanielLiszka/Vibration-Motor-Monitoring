@@ -96,9 +96,9 @@ void blinkLED(uint8_t times, uint16_t delayMs = 200);
 void handleCloudMessage(const char* topic, const uint8_t* payload, size_t length);
 
 void setup() {
-     
+
     Serial.begin(DEBUG_BAUD_RATE);
-    delay(1000);  
+    delay(1000);
 
     printWelcomeBanner();
 
@@ -123,7 +123,7 @@ void loop() {
             break;
 
         case STATE_CALIBRATING:
-             
+
             break;
 
         case STATE_MONITORING:
@@ -189,7 +189,7 @@ void loop() {
             break;
 
         case STATE_ERROR:
-             
+
             blinkLED(3, 100);
             delay(1000);
             break;
@@ -492,7 +492,7 @@ void performCalibration() {
     uint32_t lastProgressUpdate = 0;
 
     while (samplesCollected < CALIBRATION_SAMPLES) {
-         
+
         AccelData accelData;
         if (!sensor.readAcceleration(accelData)) {
             DEBUG_PRINTLN("Failed to read sensor during calibration");
@@ -505,7 +505,7 @@ void performCalibration() {
                              accelData.z * accelData.z);
 
         if (signalProc.addSample(magnitude, 0)) {
-             
+
             signalProc.performFFT(0);
 
             FeatureVector features;
@@ -522,7 +522,7 @@ void performCalibration() {
             );
 
             if (faultDetect.addCalibrationSample(features)) {
-                 
+
                 DEBUG_PRINTLN("\n✓ Calibration complete!");
                 DEBUG_PRINTLN("========================================\n");
                 currentState = STATE_MONITORING;

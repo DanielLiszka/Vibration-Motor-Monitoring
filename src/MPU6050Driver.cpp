@@ -16,7 +16,7 @@ bool MPU6050Driver::begin() {
     DEBUG_PRINTLN("Initializing MPU6050...");
 
     Wire.begin(MPU6050_SDA_PIN, MPU6050_SCL_PIN);
-    Wire.setClock(400000);  
+    Wire.setClock(400000);
 
     if (!mpu.begin(MPU6050_I2C_ADDRESS, &Wire)) {
         lastError = "Failed to find MPU6050 chip";
@@ -129,7 +129,7 @@ bool MPU6050Driver::setFilterBandwidth(mpu6050_bandwidth_t bandwidth) {
 }
 
 bool MPU6050Driver::selfTest() {
-     
+
     AccelData data;
     for (int i = 0; i < 5; i++) {
         if (!readAcceleration(data)) {
@@ -171,7 +171,7 @@ bool MPU6050Driver::calibrate(uint16_t numSamples) {
 
     offsetX = sumX / validSamples;
     offsetY = sumY / validSamples;
-    offsetZ = (sumZ / validSamples) - 9.81;  
+    offsetZ = (sumZ / validSamples) - 9.81;
 
     DEBUG_PRINTF("Calibration complete. Offsets: X=%.3f, Y=%.3f, Z=%.3f\n",
                  offsetX, offsetY, offsetZ);
@@ -180,10 +180,10 @@ bool MPU6050Driver::calibrate(uint16_t numSamples) {
 }
 
 bool MPU6050Driver::isConnected() {
-     
+
     uint8_t whoami = 0;
     Wire.beginTransmission(MPU6050_I2C_ADDRESS);
-    Wire.write(0x75);  
+    Wire.write(0x75);
     Wire.endTransmission(false);
     Wire.requestFrom((uint8_t)MPU6050_I2C_ADDRESS, (uint8_t)1);
 
@@ -191,7 +191,7 @@ bool MPU6050Driver::isConnected() {
         whoami = Wire.read();
     }
 
-    return (whoami == 0x68 || whoami == 0x72);  
+    return (whoami == 0x68 || whoami == 0x72);
 }
 
 float MPU6050Driver::getTemperature() {

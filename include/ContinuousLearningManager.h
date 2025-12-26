@@ -75,7 +75,7 @@ public:
     bool begin();
     void reset();
 
-    // Core components
+
     void setOnlineLearner(OnlineLearner* learner) { onlineLearner = learner; }
     void setDriftDetector(DriftDetector* detector) { driftDetector = detector; }
     void setCalibrationModel(SelfCalibratingModel* model) { calibModel = model; }
@@ -83,65 +83,65 @@ public:
     void setCloudConnector(CloudConnector* connector) { cloudConnector = connector; }
     void setModelManager(ModelManager* manager) { modelManager = manager; }
 
-    // Main processing
+
     void update();
     void processSample(const float* features, size_t numFeatures,
                        const FaultResult& prediction);
 
-    // State management
+
     ContinuousLearningState getState() const { return currentState; }
     void setState(ContinuousLearningState state);
     bool isActive() const { return active; }
     void setActive(bool enabled) { active = enabled; }
 
-    // Sample collection
+
     void collectSample(const float* features, uint8_t predictedLabel,
                        float confidence, LabelSource source = LABEL_AUTO_HIGH_CONFIDENCE);
     void confirmLabel(size_t sampleIndex, uint8_t confirmedLabel);
     size_t getPendingSampleCount() const { return pendingCount; }
 
-    // Cloud interaction
+
     bool uploadPendingSamples();
     bool checkForModelUpdate();
     bool downloadAndApplyUpdate();
     void processLabelResponse(const CloudLabelResponse& response);
 
-    // Drift handling
+
     void checkForDrift(const FeatureVector& features);
     void handleDriftDetected(DriftType type);
     void triggerRecalibration();
 
-    // Online learning
+
     void updateOnlineLearner(const float* features, uint8_t label, float confidence);
     void replayReservoir();
 
-    // Statistics
+
     ContinuousLearningStats getStats() const { return stats; }
     void resetStats();
 
-    // Callbacks
+
     void setModelUpdateCallback(ModelUpdateCallback callback) { modelUpdateCb = callback; }
     void setDriftAlertCallback(DriftAlertCallback callback) { driftAlertCb = callback; }
     void setLabelReceivedCallback(LabelReceivedCallback callback) { labelReceivedCb = callback; }
 
-    // Configuration
+
     void setAutoUploadEnabled(bool enabled) { autoUploadEnabled = enabled; }
     void setAutoLabelEnabled(bool enabled) { autoLabelEnabled = enabled; }
     void setMinConfidenceForAutoLabel(float conf) { minConfidenceForAutoLabel = conf; }
     void setUploadInterval(uint32_t intervalMs) { uploadIntervalMs = intervalMs; }
     void setDriftCheckInterval(uint32_t intervalMs) { driftCheckIntervalMs = intervalMs; }
 
-    // Status
+
     String getStatusJSON() const;
     String generateReport() const;
 
 private:
-    // State
+
     ContinuousLearningState currentState;
     bool active;
     bool initialized;
 
-    // Components
+
     OnlineLearner* onlineLearner;
     DriftDetector* driftDetector;
     SelfCalibratingModel* calibModel;
@@ -149,32 +149,32 @@ private:
     CloudConnector* cloudConnector;
     ModelManager* modelManager;
 
-    // Pending samples
+
     PendingSample pendingSamples[CL_MAX_PENDING_SAMPLES];
     size_t pendingCount;
     size_t pendingHead;
 
-    // Statistics
+
     ContinuousLearningStats stats;
 
-    // Configuration
+
     bool autoUploadEnabled;
     bool autoLabelEnabled;
     float minConfidenceForAutoLabel;
     uint32_t uploadIntervalMs;
     uint32_t driftCheckIntervalMs;
 
-    // Timing
+
     uint32_t lastUploadTime;
     uint32_t lastDriftCheckTime;
     uint32_t lastModelCheckTime;
 
-    // Callbacks
+
     ModelUpdateCallback modelUpdateCb;
     DriftAlertCallback driftAlertCb;
     LabelReceivedCallback labelReceivedCb;
 
-    // Internal methods
+
     void addToPendingQueue(const PendingSample& sample);
     bool uploadBatch(size_t batchSize);
     void processCloudResponse(const String& response);
