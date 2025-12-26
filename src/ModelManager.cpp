@@ -1,9 +1,11 @@
 #include "ModelManager.h"
 #include "StorageManager.h"
+#include <ArduinoJson.h>
 #include <HTTPClient.h>
 
 #define REGISTRY_FILENAME "/model_registry.json"
 #define MODEL_DIR "/models/"
+#define MODEL_DOWNLOAD_TIMEOUT_MS 15000
 
 ModelManager::ModelManager()
     : modelCount(0)
@@ -16,6 +18,11 @@ ModelManager::ModelManager()
 {
     memset(registry, 0, sizeof(registry));
     memset(perfStats, 0, sizeof(perfStats));
+    memset(currentModelVersion, 0, sizeof(currentModelVersion));
+    memset(previousModelVersion, 0, sizeof(previousModelVersion));
+    minAccuracyForSwap = 0.70f;
+    activeModelIndex = -1;
+    previousModelIndex = -1;
 }
 
 ModelManager::~ModelManager() {
@@ -30,6 +37,7 @@ bool ModelManager::begin() {
         return false;
     }
 
+    SPIFFS.mkdir("/models");
     loadRegistry();
 
     if (autoLoadEnabled) {
@@ -190,6 +198,12 @@ bool ModelManager::activateModel(const char* name) {
 
     registry[idx].isActive = true;
     registry[idx].loadedTimestamp = millis();
+
+    if (registry[idx].type == MODEL_CLASSIFIER) {
+        activeModelIndex = idx;
+        strncpy(currentModelVersion, registry[idx].version, MODEL_VERSION_MAX_LEN - 1);
+    }
+
     saveRegistry();
 
     DEBUG_PRINT("Model activated: ");
@@ -209,6 +223,12 @@ bool ModelManager::deactivateModel(const char* name) {
 #endif
 
     registry[idx].isActive = false;
+
+    if (idx == activeModelIndex) {
+        activeModelIndex = -1;
+        currentModelVersion[0] = '\0';
+    }
+
     saveRegistry();
 
     return true;
@@ -439,31 +459,98 @@ void ModelManager::resetPerformanceStats(const char* name) {
 }
 
 bool ModelManager::exportModelRegistry(String& jsonOutput) {
-    jsonOutput = "{\"models\":[";
+    StaticJsonDocument<4096> doc;
+    JsonArray models = doc.createNestedArray("models");
 
-    bool first = true;
     for (size_t i = 0; i < MODEL_REGISTRY_SIZE; i++) {
         if (!registry[i].isValid) continue;
 
-        if (!first) jsonOutput += ",";
-        first = false;
-
-        jsonOutput += "{";
-        jsonOutput += "\"name\":\"" + String(registry[i].name) + "\",";
-        jsonOutput += "\"version\":\"" + String(registry[i].version) + "\",";
-        jsonOutput += "\"type\":" + String((int)registry[i].type) + ",";
-        jsonOutput += "\"size\":" + String(registry[i].size) + ",";
-        jsonOutput += "\"crc32\":" + String(registry[i].crc32) + ",";
-        jsonOutput += "\"active\":" + String(registry[i].isActive ? "true" : "false") + ",";
-        jsonOutput += "\"accuracy\":" + String(registry[i].accuracy, 4);
-        jsonOutput += "}";
+        JsonObject m = models.createNestedObject();
+        m["name"] = registry[i].name;
+        m["version"] = registry[i].version;
+        m["filename"] = registry[i].filename;
+        m["type"] = static_cast<int>(registry[i].type);
+        m["size"] = registry[i].size;
+        m["crc32"] = registry[i].crc32;
+        m["created"] = registry[i].createdTimestamp;
+        m["loaded"] = registry[i].loadedTimestamp;
+        m["active"] = registry[i].isActive;
+        m["accuracy"] = registry[i].accuracy;
+        m["valid"] = registry[i].isValid;
     }
 
-    jsonOutput += "]}";
+    serializeJson(doc, jsonOutput);
     return true;
 }
 
 bool ModelManager::importModelRegistry(const String& jsonInput) {
+    if (jsonInput.length() == 0) return false;
+
+    StaticJsonDocument<4096> doc;
+    DeserializationError err = deserializeJson(doc, jsonInput);
+    if (err) {
+        DEBUG_PRINT("Failed to parse model registry: ");
+        DEBUG_PRINTLN(err.c_str());
+        return false;
+    }
+
+    JsonArray models = doc["models"].as<JsonArray>();
+    if (models.isNull()) return false;
+
+    memset(registry, 0, sizeof(registry));
+    memset(perfStats, 0, sizeof(perfStats));
+    modelCount = 0;
+    activeModelIndex = -1;
+    previousModelIndex = -1;
+    currentModelVersion[0] = '\0';
+    previousModelVersion[0] = '\0';
+
+    for (JsonObject m : models) {
+        const char* name = m["name"] | "";
+        if (!name || name[0] == '\0') continue;
+
+        int idx = findFreeSlot();
+        if (idx < 0) {
+            DEBUG_PRINTLN("Model registry full while importing");
+            break;
+        }
+
+        const char* version = m["version"] | "";
+        const char* filename = m["filename"] | "";
+        const int type = m["type"] | 0;
+
+        strncpy(registry[idx].name, name, MODEL_NAME_MAX_LEN - 1);
+        strncpy(registry[idx].version, version, MODEL_VERSION_MAX_LEN - 1);
+
+        if (filename && filename[0]) {
+            strncpy(registry[idx].filename, filename, sizeof(registry[idx].filename) - 1);
+        } else {
+            String derived = String(MODEL_DIR) + String(name) + ".tflite";
+            strncpy(registry[idx].filename, derived.c_str(), sizeof(registry[idx].filename) - 1);
+        }
+
+        registry[idx].type = static_cast<TFLiteModelType>(type);
+        registry[idx].size = m["size"] | 0;
+        registry[idx].crc32 = m["crc32"] | 0;
+        registry[idx].createdTimestamp = m["created"] | 0;
+        registry[idx].loadedTimestamp = m["loaded"] | 0;
+        registry[idx].accuracy = m["accuracy"] | 0.0f;
+        registry[idx].isActive = m["active"] | false;
+        registry[idx].isValid = m["valid"] | true;
+
+        if (registry[idx].isValid) {
+            modelCount++;
+        }
+    }
+
+    for (size_t i = 0; i < MODEL_REGISTRY_SIZE; i++) {
+        if (registry[i].isValid && registry[i].isActive) {
+            activeModelIndex = (int)i;
+            strncpy(currentModelVersion, registry[i].version, MODEL_VERSION_MAX_LEN - 1);
+            break;
+        }
+    }
+
     return true;
 }
 
@@ -573,10 +660,192 @@ bool ModelManager::saveRegistry() {
 
 bool ModelManager::loadRegistry() {
     File file = SPIFFS.open(REGISTRY_FILENAME, "r");
-    if (!file) return false;
+    if (!file) {
+        memset(registry, 0, sizeof(registry));
+        memset(perfStats, 0, sizeof(perfStats));
+        modelCount = 0;
+        activeModelIndex = -1;
+        previousModelIndex = -1;
+        currentModelVersion[0] = '\0';
+        previousModelVersion[0] = '\0';
+        return true;
+    }
 
     String json = file.readString();
     file.close();
 
+    return importModelRegistry(json);
+}
+
+bool ModelManager::downloadModel(const char* url, uint8_t* buffer, size_t maxSize, size_t& downloadedSize) {
+    downloadedSize = 0;
+    if (!url || !buffer || maxSize == 0) return false;
+
+    HTTPClient http;
+    http.begin(url);
+
+    int httpCode = http.GET();
+    if (httpCode != HTTP_CODE_OK) {
+        http.end();
+        return false;
+    }
+
+    int contentLength = http.getSize();
+    WiFiClient* stream = http.getStreamPtr();
+
+    if (contentLength > 0 && (size_t)contentLength > maxSize) {
+        http.end();
+        return false;
+    }
+
+    uint32_t start = millis();
+    while (http.connected() && (contentLength < 0 || downloadedSize < (size_t)contentLength)) {
+        size_t available = stream->available();
+        if (available > 0) {
+            size_t toRead = available;
+            if (contentLength > 0) {
+                toRead = min(toRead, (size_t)contentLength - downloadedSize);
+            }
+            toRead = min(toRead, maxSize - downloadedSize);
+
+            if (toRead == 0) break;
+
+            size_t read = stream->readBytes(buffer + downloadedSize, toRead);
+            downloadedSize += read;
+        } else {
+            if (millis() - start > MODEL_DOWNLOAD_TIMEOUT_MS) break;
+            delay(1);
+        }
+        yield();
+    }
+
+    http.end();
+
+    if (contentLength > 0) {
+        return downloadedSize == (size_t)contentLength;
+    }
+    return downloadedSize > 0;
+}
+
+bool ModelManager::installModel(const char* name, const uint8_t* data, size_t size) {
+    if (!name || !data || size == 0) return false;
+
+    if (!registerModel(name, "downloaded", MODEL_CLASSIFIER, data, size)) {
+        return false;
+    }
+    return activateModel(name);
+}
+
+static void sanitizeModelName(const char* version, char* out, size_t outSize) {
+    if (!out || outSize == 0) return;
+    out[0] = '\0';
+    if (!version) return;
+
+    size_t pos = 0;
+    for (size_t i = 0; version[i] != '\0' && pos + 1 < outSize; i++) {
+        const char c = version[i];
+        if ((c >= 'a' && c <= 'z') ||
+            (c >= 'A' && c <= 'Z') ||
+            (c >= '0' && c <= '9')) {
+            out[pos++] = c;
+        } else {
+            out[pos++] = '_';
+        }
+    }
+    out[pos] = '\0';
+}
+
+bool ModelManager::archiveCurrentModel() {
+    if (activeModelIndex < 0 || activeModelIndex >= (int)MODEL_REGISTRY_SIZE) return false;
+    if (!registry[activeModelIndex].isValid) return false;
+
+    char safeVer[MODEL_VERSION_MAX_LEN * 2];
+    sanitizeModelName(registry[activeModelIndex].version, safeVer, sizeof(safeVer));
+
+    String backupFilename = String(MODEL_DIR) + "archive_";
+    backupFilename += String(registry[activeModelIndex].name);
+    backupFilename += "_";
+    backupFilename += String(safeVer);
+    backupFilename += ".tflite";
+
+    return backupModel(registry[activeModelIndex].name, backupFilename.c_str());
+}
+
+bool ModelManager::hotSwapModel(const char* newModelData, size_t size, const char* version) {
+    if (!newModelData || size == 0 || !version || version[0] == '\0') return false;
+
+    if (validationEnabled) {
+        if (!validateModelData(reinterpret_cast<const uint8_t*>(newModelData), size, 0)) {
+            DEBUG_PRINTLN("New model failed validation");
+            return false;
+        }
+    }
+
+    previousModelIndex = activeModelIndex;
+    strncpy(previousModelVersion, currentModelVersion, MODEL_VERSION_MAX_LEN - 1);
+
+    if (previousModelIndex >= 0) {
+        archiveCurrentModel();
+        deactivateModel(registry[previousModelIndex].name);
+    }
+
+    char safeVer[MODEL_VERSION_MAX_LEN * 2];
+    sanitizeModelName(version, safeVer, sizeof(safeVer));
+
+    char modelName[MODEL_NAME_MAX_LEN];
+    snprintf(modelName, sizeof(modelName), "clf_%s", safeVer);
+
+    if (!registerModel(modelName, version, MODEL_CLASSIFIER, reinterpret_cast<const uint8_t*>(newModelData), size)) {
+        DEBUG_PRINTLN("Failed to register new model for hot-swap");
+        return false;
+    }
+
+    if (!activateModel(modelName)) {
+        DEBUG_PRINTLN("Failed to activate new model for hot-swap");
+        return false;
+    }
+
+    activeModelIndex = findModelIndex(modelName);
+    strncpy(currentModelVersion, version, MODEL_VERSION_MAX_LEN - 1);
+
     return true;
+}
+
+bool ModelManager::rollbackToPreviousModel() {
+    if (previousModelIndex < 0 || previousModelIndex >= (int)MODEL_REGISTRY_SIZE) return false;
+    if (!registry[previousModelIndex].isValid) return false;
+
+    if (activeModelIndex >= 0 && activeModelIndex < (int)MODEL_REGISTRY_SIZE) {
+        deactivateModel(registry[activeModelIndex].name);
+    }
+
+    if (!activateModel(registry[previousModelIndex].name)) {
+        return false;
+    }
+
+    activeModelIndex = previousModelIndex;
+    strncpy(currentModelVersion, registry[activeModelIndex].version, MODEL_VERSION_MAX_LEN - 1);
+
+    previousModelIndex = -1;
+    previousModelVersion[0] = '\0';
+    return true;
+}
+
+const char* ModelManager::getCurrentModelVersion() const {
+    return currentModelVersion;
+}
+
+const char* ModelManager::getPreviousModelVersion() const {
+    return previousModelVersion;
+}
+
+bool ModelManager::compareModelPerformance(const char* model1, const char* model2) {
+    ModelMetadata* m1 = getModelInfo(model1);
+    ModelMetadata* m2 = getModelInfo(model2);
+    if (!m1 || !m2) return false;
+    return m1->accuracy >= m2->accuracy;
+}
+
+bool ModelManager::shouldSwapModel(float newModelAccuracy) {
+    return newModelAccuracy >= minAccuracyForSwap;
 }
