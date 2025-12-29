@@ -241,7 +241,7 @@ String MotorWebServer::generateDashboardHTML() {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Motor Vibration Monitor</title>
+    <title>VibeSentry</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -409,7 +409,7 @@ String MotorWebServer::generateDashboardHTML() {
 
     <div class="container">
         <div class="header">
-            <h1>Motor Vibration Fault Detection</h1>
+            <h1>VibeSentry</h1>
             <p>Real-time Monitoring Dashboard</p>
         </div>
 
@@ -697,7 +697,7 @@ String MotorWebServer::generateConfigHTML() {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Configuration - Motor Monitor</title>
+    <title>Configuration - VibeSentry</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
