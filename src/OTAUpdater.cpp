@@ -19,6 +19,12 @@ OTAUpdater::~OTAUpdater() {
 bool OTAUpdater::begin(const char* hostname, const char* password, uint16_t port) {
     DEBUG_PRINTLN("Initializing OTA Updater...");
 
+    if (password == nullptr || password[0] == '\0') {
+        errorMessage = "Missing OTA password";
+        DEBUG_PRINTLN("OTA disabled: set OTA_PASSWORD in include/Config.h");
+        return false;
+    }
+
     ArduinoOTA.setPort(port);
     ArduinoOTA.setHostname(hostname);
     ArduinoOTA.setPassword(password);
