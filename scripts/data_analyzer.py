@@ -33,12 +33,12 @@ class VibrationAnalyzer:
                     print(f'Warning: Skipping malformed entry: {e}')
         self.df = pd.DataFrame(data)
         self.df['timestamp'] = pd.to_datetime(self.df['timestamp'], unit='ms')
-        print(f'✓ Loaded {len(self.df)} records')
+        print(f'[OK] Loaded {len(self.df)} records')
 
     def load_csv_logs(self, file_path: str):
         self.df = pd.read_csv(file_path)
         self.df['timestamp'] = pd.to_datetime(self.df['timestamp'], unit='ms')
-        print(f'✓ Loaded {len(self.df)} records')
+        print(f'[OK] Loaded {len(self.df)} records')
 
     def generate_summary_stats(self):
         print('\n' + '=' * 60)
@@ -91,7 +91,7 @@ class VibrationAnalyzer:
         ax2.legend()
         plt.tight_layout()
         plt.savefig(f'{output_dir}/time_series.png', dpi=300, bbox_inches='tight')
-        print(f'  ✓ Saved: {output_dir}/time_series.png')
+        print(f'  [OK] Saved: {output_dir}/time_series.png')
         plt.close()
         fig, axes = plt.subplots(2, 2, figsize=(14, 10))
         features_to_plot = [('rms', 'RMS', axes[0, 0]), ('kurtosis', 'Kurtosis', axes[0, 1]), ('crestFactor', 'Crest Factor', axes[1, 0]), ('dominantFreq', 'Dominant Frequency (Hz)', axes[1, 1])]
@@ -104,7 +104,7 @@ class VibrationAnalyzer:
                 ax.scatter(self.df.loc[fault_mask, 'timestamp'], self.df.loc[fault_mask, feature], color='red', s=50, marker='x', zorder=5)
         plt.tight_layout()
         plt.savefig(f'{output_dir}/features_time_series.png', dpi=300, bbox_inches='tight')
-        print(f'  ✓ Saved: {output_dir}/features_time_series.png')
+        print(f'  [OK] Saved: {output_dir}/features_time_series.png')
         plt.close()
 
     def plot_distributions(self, output_dir: str='plots'):
@@ -131,7 +131,7 @@ class VibrationAnalyzer:
             axes[idx].set_visible(False)
         plt.tight_layout()
         plt.savefig(f'{output_dir}/distributions.png', dpi=300, bbox_inches='tight')
-        print(f'  ✓ Saved: {output_dir}/distributions.png')
+        print(f'  [OK] Saved: {output_dir}/distributions.png')
         plt.close()
 
     def plot_correlation_matrix(self, output_dir: str='plots'):
@@ -153,7 +153,7 @@ class VibrationAnalyzer:
         ax.set_title('Feature Correlation Matrix', fontsize=14, fontweight='bold', pad=20)
         plt.tight_layout()
         plt.savefig(f'{output_dir}/correlation_matrix.png', dpi=300, bbox_inches='tight')
-        print(f'  ✓ Saved: {output_dir}/correlation_matrix.png')
+        print(f'  [OK] Saved: {output_dir}/correlation_matrix.png')
         plt.close()
 
     def generate_report(self, output_file: str='analysis_report.txt'):
@@ -187,7 +187,7 @@ class VibrationAnalyzer:
                 f.write(f'  Min:  {self.df[feature].min():.4f}\n')
                 f.write(f'  Max:  {self.df[feature].max():.4f}\n')
             f.write('\n' + '=' * 70 + '\n')
-        print(f'  ✓ Saved: {output_file}')
+        print(f'  [OK] Saved: {output_file}')
 
 def main():
     import argparse
@@ -206,6 +206,6 @@ def main():
     analyzer.plot_distributions(args.output_dir)
     analyzer.plot_correlation_matrix(args.output_dir)
     analyzer.generate_report()
-    print('\n✓ Analysis complete!')
+    print('\n[OK] Analysis complete!')
 if __name__ == '__main__':
     main()

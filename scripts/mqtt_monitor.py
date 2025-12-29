@@ -35,9 +35,9 @@ class MotorMonitor:
         if rc == 0:
             self.latest_status = 'Connected'
             client.subscribe('motor/#')
-            self.console.print('[green]✓ Connected to MQTT broker[/green]')
+            self.console.print('[green][OK] Connected to MQTT broker[/green]')
         else:
-            self.console.print(f'[red]✗ Connection failed with code {rc}[/red]')
+            self.console.print(f'[red][FAIL] Connection failed with code {rc}[/red]')
 
     def on_message(self, client, userdata, msg):
         self.message_count += 1
@@ -121,7 +121,7 @@ class MotorMonitor:
         try:
             self.client.connect(self.broker, self.port, 60)
         except Exception as e:
-            self.console.print(f'[red]✗ Failed to connect: {e}[/red]')
+            self.console.print(f'[red][FAIL] Failed to connect: {e}[/red]')
             return
         self.client.loop_start()
         try:
@@ -133,7 +133,7 @@ class MotorMonitor:
         finally:
             self.client.loop_stop()
             self.client.disconnect()
-            self.console.print('[green]✓ Disconnected[/green]')
+            self.console.print('[green][OK] Disconnected[/green]')
 
 def main():
     import argparse

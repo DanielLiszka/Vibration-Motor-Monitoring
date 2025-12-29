@@ -14,14 +14,14 @@ void setup() {
 
     Serial.println("1. Testing sensor connection...");
     if (!sensor.begin()) {
-        Serial.println("   ✗ FAILED: " + sensor.getLastError());
+        Serial.println("   FAIL: " + sensor.getLastError());
         Serial.println("\nTroubleshooting:");
         Serial.println("  - Check wiring (SDA->21, SCL->22)");
         Serial.println("  - Verify 3.3V power");
         Serial.println("  - Check I2C address (default 0x68)");
         while(1) { delay(1000); }
     }
-    Serial.println("   ✓ Sensor connected successfully!\n");
+    Serial.println("   OK: Sensor connected\n");
 
     Serial.println("2. Sensor Information:");
     Serial.printf("   Temperature: %.2f °C\n", sensor.getTemperature());
@@ -63,6 +63,6 @@ void loop() {
             Serial.println("─────────────────────────────────────────────────────────────────\n");
         }
     } else {
-        Serial.println("✗ Read error!");
+        Serial.println("Read error!");
     }
 }

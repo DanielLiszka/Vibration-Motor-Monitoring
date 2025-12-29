@@ -28,7 +28,7 @@ void setup() {
     Serial.println("╚════════════════════════════════════════╝\n");
 
     if (!processor.begin()) {
-        Serial.println("✗ Failed to initialize signal processor");
+        Serial.println("Failed to initialize signal processor");
         while(1) { delay(1000); }
     }
 
@@ -44,7 +44,7 @@ void setup() {
     Serial.println("──────────────────────────────────");
     benchmarkFFT();
 
-    Serial.println("\n✓ All tests complete!");
+    Serial.println("\nAll tests complete!");
 }
 
 void testSingleFrequency(float freq, float amplitude) {
@@ -69,9 +69,9 @@ void testSingleFrequency(float freq, float amplitude) {
     Serial.printf("FFT computation time: %lu µs\n", fftTime);
 
     if (abs(dominantFreq - freq) < 1.0) {
-        Serial.println("✓ PASS - Frequency detected accurately");
+        Serial.println("PASS - Frequency detected accurately");
     } else {
-        Serial.println("✗ FAIL - Frequency detection error too large");
+        Serial.println("FAIL - Frequency detection error too large");
     }
 
     processor.reset();
@@ -148,9 +148,9 @@ void benchmarkFFT() {
     Serial.printf("  CPU usage: %.1f%%\n", (fftDuration / windowDuration) * 100.0);
 
     if (fftDuration < windowDuration) {
-        Serial.println("  ✓ Real-time processing capable");
+        Serial.println("  OK - Real-time processing capable");
     } else {
-        Serial.println("  ✗ Cannot keep up with real-time");
+        Serial.println("  FAIL - Cannot keep up with real-time");
     }
 }
 
