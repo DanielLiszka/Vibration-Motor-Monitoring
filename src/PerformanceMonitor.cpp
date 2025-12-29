@@ -142,7 +142,7 @@ void PerformanceMonitor::printReport() const {
     Serial.println("\n[CPU]");
     Serial.printf("  CPU Usage:         %.1f%%\n", metrics.cpuUsage);
     Serial.printf("  Real-Time:         %s\n",
-                  isRealTimeCapable() ? "✓ Yes" : "✗ No");
+                  isRealTimeCapable() ? "Yes" : "No");
 
     Serial.println("\n[STATISTICS]");
     Serial.printf("  Total Samples:     %lu\n", metrics.totalSamples);

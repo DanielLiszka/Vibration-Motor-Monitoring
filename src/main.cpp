@@ -206,7 +206,7 @@ void initializeSystem() {
         handleError("MPU6050 initialization failed: " + sensor.getLastError());
         return;
     }
-    DEBUG_PRINTLN("   ✓ MPU6050 OK\n");
+    DEBUG_PRINTLN("   [OK] MPU6050\n");
     blinkLED(1);
 
     DEBUG_PRINTLN("2. Initializing Signal Processor...");
@@ -214,7 +214,7 @@ void initializeSystem() {
         handleError("Signal processor initialization failed");
         return;
     }
-    DEBUG_PRINTLN("   ✓ Signal Processor OK\n");
+    DEBUG_PRINTLN("   [OK] Signal Processor\n");
     blinkLED(1);
 
     DEBUG_PRINTLN("3. Initializing Fault Detector...");
@@ -222,7 +222,7 @@ void initializeSystem() {
         handleError("Fault detector initialization failed");
         return;
     }
-    DEBUG_PRINTLN("   ✓ Fault Detector OK\n");
+    DEBUG_PRINTLN("   [OK] Fault Detector\n");
     blinkLED(1);
 
     DEBUG_PRINTLN("4. Initializing Data Logger...");
@@ -230,18 +230,18 @@ void initializeSystem() {
         handleError("Data logger initialization failed");
         return;
     }
-    DEBUG_PRINTLN("   ✓ Data Logger OK\n");
+    DEBUG_PRINTLN("   [OK] Data Logger\n");
     blinkLED(1);
 
     if (WIFI_ENABLED) {
         DEBUG_PRINTLN("5. Initializing WiFi...");
         if (wifiMgr.begin()) {
-            DEBUG_PRINTLN("   ✓ WiFi OK\n");
+            DEBUG_PRINTLN("   [OK] WiFi\n");
             blinkLED(2);
 
             DEBUG_PRINTLN("6. Initializing Web Server...");
             if (webServer.begin()) {
-                DEBUG_PRINTLN("   ✓ Web Server OK\n");
+                DEBUG_PRINTLN("   [OK] Web Server\n");
                 blinkLED(1);
             } else {
                 DEBUG_PRINTLN("   ⚠ Web Server failed\n");
@@ -250,7 +250,7 @@ void initializeSystem() {
             if (MQTT_ENABLED) {
                 DEBUG_PRINTLN("7. Initializing MQTT...");
                 if (mqttMgr.begin(MQTT_BROKER_ADDRESS, MQTT_BROKER_PORT, DEVICE_ID)) {
-                    DEBUG_PRINTLN("   ✓ MQTT OK\n");
+                    DEBUG_PRINTLN("   [OK] MQTT\n");
                     blinkLED(1);
                 } else {
                     DEBUG_PRINTLN("   ⚠ MQTT failed\n");
@@ -278,7 +278,7 @@ void initializeSystem() {
                     cloudConnector.setMessageCallback(handleCloudMessage);
                     cloudConnector.subscribeModelUpdates();
                     cloudConnector.subscribeLabelResponses();
-                    DEBUG_PRINTLN("   ✓ Cloud Connector OK\n");
+                    DEBUG_PRINTLN("   [OK] Cloud Connector\n");
                 } else {
                     DEBUG_PRINTLN("   ⚠ Cloud Connector failed\n");
                 }
@@ -286,7 +286,7 @@ void initializeSystem() {
 
             DEBUG_PRINTLN("8. Initializing OTA Updater...");
             if (otaUpdater.begin(DEVICE_ID, OTA_PASSWORD)) {
-                DEBUG_PRINTLN("   ✓ OTA Updater OK\n");
+                DEBUG_PRINTLN("   [OK] OTA Updater\n");
                 blinkLED(1);
             } else {
                 DEBUG_PRINTLN("   ⚠ OTA Updater failed\n");
@@ -298,63 +298,63 @@ void initializeSystem() {
 
     DEBUG_PRINTLN("9. Initializing Performance Monitor...");
     perfMon.begin();
-    DEBUG_PRINTLN("   ✓ Performance Monitor OK\n");
+    DEBUG_PRINTLN("   [OK] Performance Monitor\n");
 
     DEBUG_PRINTLN("10. Initializing Data Buffer...");
     dataBuffer.setAutoExport(true);
     dataBuffer.setAutoExportInterval(300000);
-    DEBUG_PRINTLN("   ✓ Data Buffer OK\n");
+    DEBUG_PRINTLN("   [OK] Data Buffer\n");
 
     DEBUG_PRINTLN("11. Initializing Storage Manager...");
     if (storageMgr.begin()) {
-        DEBUG_PRINTLN("   ✓ Storage Manager OK\n");
+        DEBUG_PRINTLN("   [OK] Storage Manager\n");
     } else {
         DEBUG_PRINTLN("   ⚠ Storage Manager failed\n");
     }
 
     DEBUG_PRINTLN("12. Initializing Trend Analyzer...");
     trendAnalyzer.begin();
-    DEBUG_PRINTLN("   ✓ Trend Analyzer OK\n");
+    DEBUG_PRINTLN("   [OK] Trend Analyzer\n");
 
     DEBUG_PRINTLN("13. Initializing Alert Manager...");
     alertMgr.begin();
-    DEBUG_PRINTLN("   ✓ Alert Manager OK\n");
+    DEBUG_PRINTLN("   [OK] Alert Manager\n");
 
     DEBUG_PRINTLN("14. Initializing Multi-Axis Analyzer...");
     multiAxis.begin();
-    DEBUG_PRINTLN("   ✓ Multi-Axis Analyzer OK\n");
+    DEBUG_PRINTLN("   [OK] Multi-Axis Analyzer\n");
 
     DEBUG_PRINTLN("15. Initializing Edge ML...");
     if (edgeML.begin()) {
-        DEBUG_PRINTLN("   ✓ Edge ML OK\n");
+        DEBUG_PRINTLN("   [OK] Edge ML\n");
     } else {
         DEBUG_PRINTLN("   ⚠ Edge ML failed\n");
     }
 
     DEBUG_PRINTLN("16. Initializing Online Learner...");
     if (onlineLearner.begin()) {
-        DEBUG_PRINTLN("   ✓ Online Learner OK\n");
+        DEBUG_PRINTLN("   [OK] Online Learner\n");
     } else {
         DEBUG_PRINTLN("   ⚠ Online Learner failed\n");
     }
 
     DEBUG_PRINTLN("17. Initializing Drift Detector...");
     if (driftDetector.begin()) {
-        DEBUG_PRINTLN("   ✓ Drift Detector OK\n");
+        DEBUG_PRINTLN("   [OK] Drift Detector\n");
     } else {
         DEBUG_PRINTLN("   ⚠ Drift Detector failed\n");
     }
 
     DEBUG_PRINTLN("18. Initializing Self-Calibrating Model...");
     if (selfCalibModel.begin()) {
-        DEBUG_PRINTLN("   ✓ Self-Calibrating Model OK\n");
+        DEBUG_PRINTLN("   [OK] Self-Calibrating Model\n");
     } else {
         DEBUG_PRINTLN("   ⚠ Self-Calibrating Model failed\n");
     }
 
     DEBUG_PRINTLN("19. Initializing Maintenance Scheduler...");
     if (maintScheduler.begin()) {
-        DEBUG_PRINTLN("   ✓ Maintenance Scheduler OK\n");
+        DEBUG_PRINTLN("   [OK] Maintenance Scheduler\n");
     } else {
         DEBUG_PRINTLN("   ⚠ Maintenance Scheduler failed\n");
     }
@@ -362,32 +362,32 @@ void initializeSystem() {
     DEBUG_PRINTLN("20. Initializing Energy Monitor...");
     if (energyMon.begin()) {
         energyMon.setEnergyRate(0.12);
-        DEBUG_PRINTLN("   ✓ Energy Monitor OK\n");
+        DEBUG_PRINTLN("   [OK] Energy Monitor\n");
     } else {
         DEBUG_PRINTLN("   ⚠ Energy Monitor failed\n");
     }
 
     DEBUG_PRINTLN("21. Initializing Self-Diagnostic...");
     selfDiag.begin();
-    DEBUG_PRINTLN("   ✓ Self-Diagnostic OK\n");
+    DEBUG_PRINTLN("   [OK] Self-Diagnostic\n");
 
     DEBUG_PRINTLN("22. Initializing System Hardening...");
     if (sysHardening.begin()) {
-        DEBUG_PRINTLN("   ✓ System Hardening OK\n");
+        DEBUG_PRINTLN("   [OK] System Hardening\n");
     } else {
         DEBUG_PRINTLN("   ⚠ System Hardening failed\n");
     }
 
     DEBUG_PRINTLN("23. Initializing Security Manager...");
     if (securityMgr.begin()) {
-        DEBUG_PRINTLN("   ✓ Security Manager OK\n");
+        DEBUG_PRINTLN("   [OK] Security Manager\n");
     } else {
         DEBUG_PRINTLN("   ⚠ Security Manager failed\n");
     }
 
     DEBUG_PRINTLN("24. Initializing Extended Feature Extractor...");
     if (extFeatureExt.begin()) {
-        DEBUG_PRINTLN("   ✓ Extended Feature Extractor OK\n");
+        DEBUG_PRINTLN("   [OK] Extended Feature Extractor\n");
     } else {
         DEBUG_PRINTLN("   ⚠ Extended Feature Extractor failed\n");
     }
@@ -400,7 +400,7 @@ void initializeSystem() {
         ensembleClassifier.setMethod(ENSEMBLE_WEIGHTED);
         ensembleClassifier.addModel("CustomNN", BACKEND_CUSTOM_NN, 0.8f);
         ensembleClassifier.addModel("OnlineLearner", BACKEND_ONLINE_LEARNER, 0.6f);
-        DEBUG_PRINTLN("   ✓ Ensemble Classifier OK\n");
+        DEBUG_PRINTLN("   [OK] Ensemble Classifier\n");
     } else {
         DEBUG_PRINTLN("   ⚠ Ensemble Classifier failed\n");
     }
@@ -408,7 +408,7 @@ void initializeSystem() {
 #ifdef USE_TFLITE
     DEBUG_PRINTLN("26. Initializing TFLite Engine...");
     if (tfliteEngine.begin()) {
-        DEBUG_PRINTLN("   ✓ TFLite Engine OK\n");
+        DEBUG_PRINTLN("   [OK] TFLite Engine\n");
     } else {
         DEBUG_PRINTLN("   ⚠ TFLite Engine failed\n");
     }
@@ -420,7 +420,7 @@ void initializeSystem() {
         modelManager.setTFLiteEngine(&tfliteEngine);
 #endif
         modelManager.setEdgeML(&edgeML);
-        DEBUG_PRINTLN("   ✓ Model Manager OK\n");
+        DEBUG_PRINTLN("   [OK] Model Manager\n");
     } else {
         DEBUG_PRINTLN("   ⚠ Model Manager failed\n");
     }
@@ -434,7 +434,7 @@ void initializeSystem() {
     clManager.setModelManager(&modelManager);
     if (clManager.begin()) {
         clManager.setActive(true);
-        DEBUG_PRINTLN("   ✓ Continuous Learning Manager OK\n");
+        DEBUG_PRINTLN("   [OK] Continuous Learning Manager\n");
     } else {
         DEBUG_PRINTLN("   ⚠ Continuous Learning Manager failed\n");
     }
@@ -450,7 +450,7 @@ void initializeSystem() {
             restApi->setEdgeML(&edgeML);
             restApi->setPerformanceMonitor(&perfMon);
             restApi->setCalibrationCallback([]() { calibrationRequestPending = true; });
-            DEBUG_PRINTLN("   ✓ REST API OK\n");
+            DEBUG_PRINTLN("   [OK] REST API\n");
         } else {
             DEBUG_PRINTLN("   ⚠ REST API failed\n");
         }
@@ -464,7 +464,7 @@ void initializeSystem() {
         modbusServer.setResetCallback([]() {
             ESP.restart();
         });
-        DEBUG_PRINTLN("   ✓ Modbus Server OK\n");
+        DEBUG_PRINTLN("   [OK] Modbus Server\n");
     } else {
         DEBUG_PRINTLN("   ⚠ Modbus Server failed\n");
     }
@@ -523,7 +523,7 @@ void performCalibration() {
 
             if (faultDetect.addCalibrationSample(features)) {
 
-                DEBUG_PRINTLN("\n✓ Calibration complete!");
+                DEBUG_PRINTLN("\nCalibration complete!");
                 DEBUG_PRINTLN("========================================\n");
                 currentState = STATE_MONITORING;
                 blinkLED(5, 100);

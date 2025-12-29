@@ -53,22 +53,22 @@ struct DiagnosticResult {
     }
 
     void print() const {
-        Serial.println("\n╔════════════════════════════════════════════════╗");
-        Serial.println("║          SYSTEM DIAGNOSTICS                   ║");
-        Serial.println("╚════════════════════════════════════════════════╝");
+        Serial.println("\n==============================");
+        Serial.println("       SYSTEM DIAGNOSTICS");
+        Serial.println("==============================");
 
         Serial.printf("Overall Status: %s\n", getStatusName(overall));
         Serial.printf("Uptime: %lu seconds\n\n", uptime / 1000);
 
-        Serial.printf("Sensor:      %s  %s\n", sensorOK ? "✓" : "✗", sensorMessage.c_str());
+        Serial.printf("Sensor:      %s  %s\n", sensorOK ? "OK" : "FAIL", sensorMessage.c_str());
         Serial.printf("Memory:      %s  %s (%lu bytes free)\n",
-                     memoryOK ? "✓" : "✗", memoryMessage.c_str(), freeHeap);
+                     memoryOK ? "OK" : "FAIL", memoryMessage.c_str(), freeHeap);
         Serial.printf("WiFi:        %s  %s (%d dBm)\n",
-                     wifiOK ? "✓" : "✗", wifiMessage.c_str(), wifiRSSI);
-        Serial.printf("Storage:     %s  %s\n", storageOK ? "✓" : "✗", storageMessage.c_str());
-        Serial.printf("Temperature: %s  %.1f°C\n", temperatureOK ? "✓" : "✗", sensorTemp);
+                     wifiOK ? "OK" : "FAIL", wifiMessage.c_str(), wifiRSSI);
+        Serial.printf("Storage:     %s  %s\n", storageOK ? "OK" : "FAIL", storageMessage.c_str());
+        Serial.printf("Temperature: %s  %.1f C\n", temperatureOK ? "OK" : "FAIL", sensorTemp);
 
-        Serial.println("════════════════════════════════════════════════\n");
+        Serial.println("==============================\n");
     }
 
     const char* getStatusName(DiagnosticStatus status) const {
