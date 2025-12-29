@@ -16,3 +16,5 @@ Networked features are disabled by default and can be enabled in `include/Config
 - Web dashboard
 - MQTT
 - OTA updates
+
+If you enable network features, avoid committing credentials. OTA also requires a non-empty `OTA_PASSWORD`.
