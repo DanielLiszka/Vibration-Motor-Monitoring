@@ -270,7 +270,7 @@ void initializeSystem() {
                 cloudConfig.useTLS = false;
 
                 cloudConnector.setWillMessage(
-                    (String("motor-monitor/") + cloudClientId + "/status").c_str(),
+                    (String("vibesentry/") + cloudClientId + "/status").c_str(),
                     "offline"
                 );
 
