@@ -99,7 +99,7 @@ enum SeverityLevel {
 #define MQTT_BROKER_PORT MQTT_PORT
 
 #define OTA_ENABLED false
-#define OTA_PASSWORD "motor-update-2024"
+#define OTA_PASSWORD ""
 #define OTA_HOSTNAME DEVICE_NAME
 
 #define VOLTAGE_NOMINAL 220.0f
