@@ -1,6 +1,6 @@
-# VibeSentry
+# Motor Vibration Monitor
 
-VibeSentry is firmware for an ESP32 + MPU6050 that watches motor vibration and flags changes that can hint at mechanical issues (imbalance, misalignment, bearing wear, looseness). It’s built for tinkering, diagnostics, and learning — not as a safety system.
+Motor Vibration Monitor is firmware for an ESP32 + MPU6050 that watches motor vibration and flags changes that can hint at mechanical issues (imbalance, misalignment, bearing wear, looseness). It’s built for tinkering, diagnostics, and learning — not as a safety system.
 
 ## Highlights
 
@@ -30,8 +30,8 @@ Default wiring:
 2. Clone the repo:
 
 ```bash
-git clone https://github.com/DanielLiszka/vibesentry.git
-cd vibesentry
+git clone https://github.com/DanielLiszka/motor-vibration-monitor.git
+cd motor-vibration-monitor
 ```
 
 3. Review `include/Config.h` and (optionally) enable WiFi/MQTT/OTA.

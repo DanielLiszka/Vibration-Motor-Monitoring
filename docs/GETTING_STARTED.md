@@ -38,8 +38,8 @@ python -m pip install platformio
 ## 3) Clone the repo
 
 ```bash
-git clone https://github.com/DanielLiszka/vibesentry.git
-cd vibesentry
+git clone https://github.com/DanielLiszka/motor-vibration-monitor.git
+cd motor-vibration-monitor
 ```
 
 ## 4) Configure

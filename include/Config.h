@@ -4,8 +4,8 @@
 #include <Arduino.h>
 
 #define FIRMWARE_VERSION "2.0.0"
-#define DEVICE_NAME "VibeSentry"
-#define DEVICE_ID "vibesentry-001"
+#define DEVICE_NAME "MotorVibrationMonitor"
+#define DEVICE_ID "motor-vibration-monitor-001"
 
 #define MPU6050_I2C_ADDRESS 0x68
 #define MPU6050_SDA_PIN 21

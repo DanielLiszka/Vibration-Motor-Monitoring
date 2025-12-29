@@ -1,7 +1,7 @@
 
 # Examples Directory
 
-This directory contains example programs and configurations for VibeSentry.
+This directory contains example programs and configurations for Motor Vibration Monitor.
 
 ## Example Programs
 

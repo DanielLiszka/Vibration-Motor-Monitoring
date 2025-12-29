@@ -1,6 +1,6 @@
 # Deployment notes
 
-This document is for people who want to leave VibeSentry installed for long periods (shop, lab, hobby setup). It’s not a formal “industrial deployment” guide, but it covers the practical stuff that tends to bite first-time installs.
+This document is for people who want to leave Motor Vibration Monitor installed for long periods (shop, lab, hobby setup). It’s not a formal “industrial deployment” guide, but it covers the practical stuff that tends to bite first-time installs.
 
 ## Hardware
 

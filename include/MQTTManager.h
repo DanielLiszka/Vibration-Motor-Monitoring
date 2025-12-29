@@ -30,7 +30,7 @@ public:
     ~MQTTManager();
 
     bool begin(const char* broker, uint16_t port = MQTT_DEFAULT_PORT,
-               const char* clientId = "vibesentry",
+               const char* clientId = "motor-vibration-monitor",
                const char* username = nullptr, const char* password = nullptr);
 
     void loop();

@@ -74,7 +74,7 @@ class MotorMonitor:
         layout = Layout()
         layout.split_column(Layout(name='header', size=3), Layout(name='body'), Layout(name='footer', size=5))
         uptime = datetime.now() - self.start_time
-        header_text = f'VibeSentry | Uptime: {uptime} | Messages: {self.message_count}'
+        header_text = f'Motor Vibration Monitor | Uptime: {uptime} | Messages: {self.message_count}'
         layout['header'].update(Panel(header_text, style='bold white on blue'))
         layout['body'].split_row(Layout(name='left'), Layout(name='right'))
         if self.latest_vibration:
@@ -116,7 +116,7 @@ class MotorMonitor:
         return layout
 
     def run(self):
-        self.console.print('[bold blue]VibeSentry MQTT Monitor[/bold blue]')
+        self.console.print('[bold blue]Motor Vibration MQTT Monitor[/bold blue]')
         self.console.print(f'Connecting to {self.broker}:{self.port}...\n')
         try:
             self.client.connect(self.broker, self.port, 60)
@@ -137,7 +137,7 @@ class MotorMonitor:
 
 def main():
     import argparse
-    parser = argparse.ArgumentParser(description='VibeSentry MQTT Monitor')
+    parser = argparse.ArgumentParser(description='Motor Vibration MQTT Monitor')
     parser.add_argument('--broker', default='broker.hivemq.com', help='MQTT broker address (default: broker.hivemq.com)')
     parser.add_argument('--port', type=int, default=1883, help='MQTT broker port (default: 1883)')
     args = parser.parse_args()

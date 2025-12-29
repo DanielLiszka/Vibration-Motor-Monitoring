@@ -1,11 +1,11 @@
 cff-version: 1.2.0
-title: VibeSentry
+title: Motor Vibration Monitor
 message: If you use this project, please cite it.
 type: software
 authors:
   - family-names: Liszka
     given-names: Daniel
     email: liszkadp@alumni.vcu.edu
-url: https://github.com/DanielLiszka/vibesentry
+url: https://github.com/DanielLiszka/motor-vibration-monitor
 version: 2.0.0
 date-released: 2025-12-29

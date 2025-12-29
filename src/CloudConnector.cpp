@@ -603,7 +603,7 @@ GenericMQTTConnector::GenericMQTTConnector() {
     memset(topicPrefix, 0, sizeof(topicPrefix));
     memset(willTopic, 0, sizeof(willTopic));
     memset(willMessage, 0, sizeof(willMessage));
-    strcpy(topicPrefix, "vibesentry");
+    strcpy(topicPrefix, "motor-vibration-monitor");
 }
 
 bool GenericMQTTConnector::connect() {

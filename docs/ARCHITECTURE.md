@@ -1,6 +1,6 @@
 # Architecture
 
-VibeSentry’s firmware is structured as a pipeline:
+Motor Vibration Monitor’s firmware is structured as a pipeline:
 
 1. **Sensor I/O**: read accelerometer samples from the MPU6050.
 2. **Signal processing**: windowing and FFT over fixed-size sample windows.
