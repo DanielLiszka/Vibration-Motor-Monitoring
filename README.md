@@ -1,6 +1,6 @@
-# Motor Vibration Fault Detection System
+# VibeSentry
 
-An ESP32-based system that monitors motor vibrations in real time and detects faults before they cause failures. It performs windowed FFT analysis, extracts statistical features, learns a baseline during calibration, and raises alerts when vibration patterns deviate from normal.
+VibeSentry is ESP32 firmware for monitoring motor vibration in real time and flagging patterns that often show up before failures. It performs windowed FFT analysis, extracts statistical features, learns a baseline during calibration, and raises alerts when vibration patterns drift away from normal.
 
 ## What It Does
 
@@ -36,8 +36,8 @@ SCL    -->  GPIO 22
 
 2. Clone and configure:
 ```bash
-git clone https://github.com/DanielLiszka/Embedded_Project.git
-cd Embedded_Project
+git clone https://github.com/DanielLiszka/vibesentry.git
+cd vibesentry
 ```
 
 3. Optional: enable network features in `include/Config.h` (disabled by default) and set your WiFi credentials:
