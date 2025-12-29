@@ -8,6 +8,7 @@ Thanks for taking the time to contribute!
 - Build firmware: `pio run -e esp32dev`
 - Upload firmware: `pio run -e esp32dev -t upload`
 - Serial monitor: `pio device monitor`
+  - If `pio` is not on your PATH, use `python -m platformio` instead.
 
 ## Guidelines
 
@@ -20,4 +21,3 @@ Thanks for taking the time to contribute!
 
 - Include hardware details (ESP32 variant, sensor module, wiring), firmware version, and a serial log snippet.
 - If possible, describe steps to reproduce and expected vs. actual behavior.
-
