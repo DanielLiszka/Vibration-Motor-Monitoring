@@ -704,7 +704,7 @@ void printWelcomeBanner() {
     Serial.println("\n");
     Serial.println("╔════════════════════════════════════════════════════════╗");
     Serial.println("║                                                        ║");
-    Serial.println("║   Motor Vibration Fault Detection System              ║");
+    Serial.println("║   VibeSentry                                          ║");
     Serial.println("║   Version " FIRMWARE_VERSION "                                     ║");
     Serial.println("║                                                        ║");
     Serial.println("║   Powered by ESP32 + MPU6050                          ║");
