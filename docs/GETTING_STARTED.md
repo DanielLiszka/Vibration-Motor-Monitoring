@@ -133,7 +133,7 @@ pio run --target upload && pio device monitor
 
 ```
 ╔════════════════════════════════════════════════════════╗
-║   Motor Vibration Fault Detection System              ║
+║   VibeSentry                                         ║
 ║   Version 2.0.0                                        ║
 ╚════════════════════════════════════════════════════════╝
 

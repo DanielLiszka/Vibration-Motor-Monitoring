@@ -1,6 +1,6 @@
 ## Production Deployment Guide
 
-This guide covers deploying the Motor Vibration Fault Detection System in a production environment.
+This guide covers deploying VibeSentry in a production environment.
 
 ## Pre-Deployment Checklist
 
