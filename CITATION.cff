@@ -1,11 +1,11 @@
 cff-version: 1.2.0
-title: Motor Vibration Fault Detection System
+title: VibeSentry
 message: If you use this project, please cite it.
 type: software
 authors:
   - family-names: Liszka
     given-names: Daniel
     email: liszkadp@alumni.vcu.edu
-url: https://github.com/DanielLiszka/Embedded_Project
+url: https://github.com/DanielLiszka/vibesentry
 version: 1.0.0
 date-released: 2025-01-16
