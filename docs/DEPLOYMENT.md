@@ -327,7 +327,7 @@ For monitoring multiple motors:
 
 **Configuration:**
 ```cpp
-#define DEVICE_NAME "MotorVibMonitor_01"
+#define DEVICE_NAME "VibeSentry_01"
 #define MQTT_CLIENT_ID DEVICE_NAME
 ```
 
