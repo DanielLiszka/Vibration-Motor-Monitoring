@@ -1,137 +1,115 @@
 # Motor Vibration Monitor
 
-Motor Vibration Monitor is firmware for an ESP32 + MPU6050 that watches motor vibration and flags changes that can hint at mechanical issues (imbalance, misalignment, bearing wear, looseness).
+Motor Vibration Monitor is an ESP32-based vibration monitor for small motors and rotating equipment. It uses an MPU6050 accelerometer to sample vibration, compute a frequency spectrum on-device, and compare the current signal against a learned baseline. When the behavior drifts, it can raise warnings, publish telemetry, and expose the results through a local web dashboard.
 
-It's useful for diagnostics, experimentation, and learning. It is not a safety system and shouldn't be the only thing you rely on to protect people or equipment.
+The project is meant for diagnostics, prototyping, and condition-monitoring experiments. It is not a safety system, and it should not be the only layer protecting people, machinery, or production equipment.
 
-## Highlights
+## What the firmware does
 
-- On-device sampling and FFT (windowed)
-- Baseline calibration + anomaly scoring
-- Optional fault classification (rule-based + lightweight model)
-- Serial logging, MQTT telemetry, and a small web dashboard (optional)
-- Helper scripts for MQTT monitoring and offline analysis
+In normal operation, the device samples acceleration at a fixed rate, processes each window with an FFT, extracts a small set of time-domain and frequency-domain features, and scores those features against a baseline captured during calibration. That baseline represents a known-good operating state for the motor with the sensor mounted in its final position.
 
-## What it does
+On top of that core loop, the firmware can serve a local dashboard, publish MQTT telemetry, accept runtime configuration through a REST API, collect samples for cloud-side labeling and retraining, and apply verified model updates when they are available.
 
-At a high level:
+## Hardware
 
-- Samples acceleration from the MPU6050 at a fixed rate.
-- Processes each window with a Hann/Hanning window + FFT.
-- Extracts a feature vector from the time and frequency domains.
-- Learns a "normal" baseline during calibration.
-- Scores each window against the baseline and raises warning/critical alerts when it drifts.
+The intended hardware is simple:
 
-## Hardware and wiring
+- an ESP32 development board
+- an MPU6050 breakout over I2C
+- stable 3.3V power
+- a rigid mounting method for the sensor
 
-- ESP32 DevKit v1 (or similar ESP32 board)
-- MPU6050 breakout (I2C)
-- 3.3V power, wiring, and a way to mount the sensor firmly to the motor
+By default, the firmware expects the following wiring, which matches the values in `include/Config.h`:
 
-Default wiring (matches the defaults in `include/Config.h`):
+- `VCC -> 3.3V`
+- `GND -> GND`
+- `SDA -> GPIO 21`
+- `SCL -> GPIO 22`
+- optional interrupt line: `INT -> GPIO 19`
 
-- MPU6050 VCC -> ESP32 3.3V
-- MPU6050 GND -> ESP32 GND
-- MPU6050 SDA -> GPIO 21
-- MPU6050 SCL -> GPIO 22
-- (Optional) MPU6050 INT -> GPIO 19
+The mount matters more than most threshold tuning. A loose sensor, flexible bracket, or unsecured cable will show up as vibration, and the firmware cannot distinguish that from a real mechanical issue.
 
-Mounting notes:
+## Getting started
 
-- Mount the sensor rigidly to the motor housing. A loose sensor will look like a noisy motor.
-- Secure the wiring so it can't flap around and add its own vibration.
-
-## Build and flash
-
-1. Install PlatformIO (VS Code extension or CLI).
-2. Clone the repo:
+Clone the repository, install PlatformIO, and build the `esp32dev` environment. The device dashboard is served from SPIFFS, so the filesystem image needs to be uploaded as well as the firmware.
 
 ```bash
 git clone https://github.com/DanielLiszka/motor-vibration-monitor.git
 cd motor-vibration-monitor
-```
 
-3. Review `include/Config.h` and (optionally) enable WiFi/MQTT/OTA.
-4. Build and upload:
-
-```bash
 pio run -e esp32dev -t upload
+pio run -e esp32dev -t buildfs
+pio run -e esp32dev -t uploadfs
 pio device monitor
 ```
 
-If `pio` is not on your PATH:
+If `pio` is not on your `PATH`, the Python entrypoint works the same way:
 
 ```bash
 python -m platformio run -e esp32dev -t upload
+python -m platformio run -e esp32dev -t buildfs
+python -m platformio run -e esp32dev -t uploadfs
 python -m platformio device monitor
 ```
 
-## Configuration
+## First boot and setup
 
-Most settings live in `include/Config.h`.
+Sampling and feature-extraction constants still live in `include/Config.h`, but the settings you are likely to change in day-to-day use do not. Device identity, warning thresholds, dashboard timing, WiFi settings, MQTT settings, and OTA settings are stored at runtime and can be changed through the dashboard or REST API.
 
-Common knobs:
+If the device does not have usable WiFi credentials, it starts a fallback provisioning access point with a name like `MotorMonitor-Setup-XXXXXX`. Join that network, open `http://192.168.4.1/`, enter the network settings you want the device to use, save them, and then restart the board.
 
-- Sampling: `SAMPLING_FREQUENCY_HZ`, `WINDOW_SIZE`
-- Sensitivity: `THRESHOLD_MULTIPLIER_WARNING`, `THRESHOLD_MULTIPLIER_CRITICAL`
-- Network features: `WIFI_ENABLED`, `MQTT_ENABLED`, `OTA_ENABLED`
+Once the device joins your normal network, the same dashboard remains available from its assigned IP address.
 
-If you enable network features, don't commit credentials. This repo ignores common local headers like `credentials.h` and `secrets.h` via `.gitignore`.
+## Calibration and normal use
 
-## Calibration
+Calibration should be done with the motor running in a known-good state, under the load you actually care about, and with the sensor mounted exactly where it will stay. If you move the sensor, change the mount, or materially change the operating condition, calibrate again.
 
-Calibration should be done with the motor running in a known-good state and with the sensor mounted in its final position. If you move the sensor or change the mounting, re-calibrate.
+Persistent warnings immediately after calibration usually mean the baseline was captured under unstable conditions. In practice that is often a poor mount, a changing load, or nearby vibration from something other than the motor being monitored.
 
-If you see persistent warnings right after a "good" calibration, treat it as a sign the baseline was captured under a non-normal condition (loose mount, changing load, nearby vibration source).
+## Dashboard, MQTT, and updates
 
-## MQTT and dashboard
+The device dashboard shows the live feature set, current fault state, recent history, and configuration controls. If station WiFi is not available, the same dashboard is reachable over the fallback provisioning AP.
 
-When enabled:
+When MQTT is enabled, the device publishes status, features, faults, and spectrum data under the `motor/*` topic family. The most common topics are `motor/status`, `motor/features`, `motor/fault`, and `motor/spectrum`.
 
-- The web dashboard is served from the ESP32 and shows live status and spectrum.
-- MQTT publishes status, features, faults, and spectrum data.
+OTA remains optional and should be treated like any other administrative surface: keep it off the public internet and use a real password. Cloud-delivered model updates are verified on-device against the expected SHA-256 digest before a hot swap is accepted.
 
-Default topics are under `motor/*` (see `include/MQTTManager.h`). Common ones:
+## Cloud and operator tooling
 
-- `motor/status`
-- `motor/features`
-- `motor/fault`
-- `motor/spectrum`
+The repository also includes a small cloud service for ingesting samples, managing labeling work, retraining from labeled data, and publishing model artifacts. The cloud-side entrypoint is documented in [cloud/README.md](cloud/README.md).
 
-To monitor MQTT traffic from a laptop/desktop:
+For local operations and validation, a few scripts are worth knowing about:
 
 ```bash
 python -m pip install -r scripts/requirements.txt
-python scripts/mqtt_monitor.py --broker <host>
 ```
 
-## OTA updates (optional)
+`python scripts/mqtt_monitor.py --broker <host>` watches MQTT traffic from a workstation.
 
-OTA is disabled by default. If you enable it, set a non-empty `OTA_PASSWORD` in `include/Config.h` before flashing.
+`python scripts/replay_to_cloud.py path\to\device_export.json --endpoint http://127.0.0.1:5000/api/ingest/samples` replays a saved device export into the cloud ingest path.
 
-Treat OTA like an admin interface: keep it off the public internet and use a strong password.
+`python scripts/cloud_e2e_smoke.py` runs a local replay, labeling, retraining, registration, and artifact-download smoke test without hardware.
+
+`python scripts/mqtt_rollout_smoke.py` runs a local broker-backed rollout smoke test with a simulated device update flow.
 
 ## Troubleshooting
 
-- MPU6050 init fails: double-check 3.3V power, SDA/SCL wiring, and the I2C address in `include/Config.h`.
-- Noisy readings / false alerts: re-mount the sensor (rigid mounting matters more than thresholds), secure the wiring, then tune thresholds.
-- Random resets: try a better USB cable/power supply; WiFi/MQTT can increase peak current draw.
-- WiFi won't connect: confirm 2.4 GHz network, SSID/password, and `WIFI_TIMEOUT_MS`.
-- MQTT won't connect: verify broker host/port and credentials, and test with `scripts/mqtt_monitor.py`.
+- If the MPU6050 will not initialize, check power, SDA/SCL wiring, and the configured I2C address first.
+- If the readings look noisy or unstable, fix the mount before changing thresholds.
+- If the board resets under load, suspect power quality before suspecting signal processing.
+- If WiFi never comes up, verify that the target network is 2.4 GHz and that the stored credentials are correct.
+- If MQTT connects intermittently, verify broker reachability, credentials, and topic configuration from a second machine.
 
-## Contributing and support
+## Development notes
 
-- Questions and bug reports: open a GitHub issue and include wiring details and a short serial log snippet.
-- PRs: keep changes focused and build `esp32dev` (`pio run -e esp32dev`) before submitting.
+The firmware and SPIFFS image both build in CI, and the Python-side regression suites cover the supported cloud flows. If you make changes to the firmware, it is worth rebuilding both the firmware image and the filesystem image before you call the change done.
+
+Questions and bug reports are best handled through GitHub issues. Useful reports usually include the board type, wiring notes, the exact firmware behavior, and a short serial log.
 
 ## Security
 
-If you believe you found a security issue, please open a GitHub Security Advisory for this repository. If you can't use advisories, contact the maintainer email listed in `CITATION.cff`.
-
-## Changelog
-
-- 2.0.0 (2025-12-29): public release cleanup, rebrand, docs consolidated into this README.
+If you believe you have found a security issue, please open a GitHub Security Advisory for the repository. If that is not possible, use the maintainer contact listed in `CITATION.cff`.
 
 ## License
 
-MIT (see `LICENSE`).
+This project is released under the MIT License. See [LICENSE](LICENSE).

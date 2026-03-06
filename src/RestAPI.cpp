@@ -1,4 +1,7 @@
 #include "RestAPI.h"
+#include "MQTTManager.h"
+#include "WebServer.h"
+#include "WiFiManager.h"
 
 RestAPI::RestAPI(AsyncWebServer* server)
     : webServer(server)
@@ -8,6 +11,11 @@ RestAPI::RestAPI(AsyncWebServer* server)
     , alertManager(nullptr)
     , edgeML(nullptr)
     , performanceMonitor(nullptr)
+    , dataBuffer(nullptr)
+    , runtimeConfig(nullptr)
+    , dashboardController(nullptr)
+    , mqttManager(nullptr)
+    , wifiManager(nullptr)
     , latestSpectrum(nullptr)
     , spectrumLength(0)
     , calibrationCallback(nullptr)
@@ -69,6 +77,10 @@ void RestAPI::setupRoutes() {
 
     webServer->on("/api/v1/alerts", HTTP_DELETE, [this](AsyncWebServerRequest* request) {
         handleDeleteAlerts(request);
+    });
+
+    webServer->on("/api/v1/alerts/ack", HTTP_POST, [this](AsyncWebServerRequest* request) {
+        handlePostAcknowledgeAlerts(request);
     });
 
     webServer->on("/api/v1/config", HTTP_GET, [this](AsyncWebServerRequest* request) {
@@ -190,6 +202,9 @@ void RestAPI::updateFault(const FaultResult& fault) {
 }
 
 void RestAPI::updateSpectrum(const float* spectrum, size_t length) {
+    if (!latestSpectrum || !spectrum) {
+        return;
+    }
     if (length > spectrumLength) length = spectrumLength;
     memcpy(latestSpectrum, spectrum, length * sizeof(float));
 }
@@ -303,7 +318,42 @@ void RestAPI::handlePostConfig(AsyncWebServerRequest* request, uint8_t* data, si
         return;
     }
 
-    sendJsonResponse(request, 200, "{\"success\":true,\"message\":\"Configuration updated\"}");
+    if (!runtimeConfig) {
+        sendErrorResponse(request, 500, "Runtime config not available");
+        return;
+    }
+
+    DynamicJsonDocument doc(2048);
+    DeserializationError error = deserializeJson(doc, data, len);
+    if (error) {
+        sendErrorResponse(request, 400, "Invalid JSON payload");
+        return;
+    }
+
+    bool restartRequired = false;
+    String configError;
+    if (!runtimeConfig->updateFromJson(doc.as<JsonVariantConst>(), restartRequired, configError)) {
+        sendErrorResponse(request, 400, configError);
+        return;
+    }
+
+    const RuntimeSettings& settings = runtimeConfig->getSettings();
+    if (faultDetector) {
+        faultDetector->setThresholds(settings.warningThreshold, settings.criticalThreshold);
+    }
+    if (dashboardController) {
+        dashboardController->setBroadcastInterval(settings.webBroadcastIntervalMs);
+    }
+
+    if (!runtimeConfig->save()) {
+        sendErrorResponse(request, 500, "Failed to persist configuration");
+        return;
+    }
+
+    String json = "{\"success\":true,\"message\":\"Configuration updated\",";
+    json += "\"restartRequired\":" + String(restartRequired ? "true" : "false");
+    json += "}";
+    sendJsonResponse(request, 200, json);
 }
 
 void RestAPI::handlePostAlert(AsyncWebServerRequest* request, uint8_t* data, size_t len) {
@@ -321,7 +371,49 @@ void RestAPI::handlePostThresholds(AsyncWebServerRequest* request, uint8_t* data
         return;
     }
 
-    sendJsonResponse(request, 200, "{\"success\":true,\"message\":\"Thresholds updated\"}");
+    if (!runtimeConfig || !faultDetector) {
+        sendErrorResponse(request, 500, "Threshold configuration not available");
+        return;
+    }
+
+    DynamicJsonDocument doc(512);
+    DeserializationError error = deserializeJson(doc, data, len);
+    if (error) {
+        sendErrorResponse(request, 400, "Invalid JSON payload");
+        return;
+    }
+
+    JsonObjectConst obj = doc.as<JsonObjectConst>();
+    JsonObjectConst thresholds = obj["thresholds"].as<JsonObjectConst>();
+    if (!thresholds.isNull()) {
+        obj = thresholds;
+    }
+
+    RuntimeSettings& settings = runtimeConfig->getMutableSettings();
+    settings.warningThreshold = obj["warning"] | settings.warningThreshold;
+    settings.criticalThreshold = obj["critical"] | settings.criticalThreshold;
+
+    if (settings.warningThreshold <= 0.0f || settings.criticalThreshold <= 0.0f) {
+        sendErrorResponse(request, 400, "Thresholds must be positive");
+        return;
+    }
+
+    if (settings.warningThreshold >= settings.criticalThreshold) {
+        sendErrorResponse(request, 400, "Critical threshold must be greater than warning threshold");
+        return;
+    }
+
+    faultDetector->setThresholds(settings.warningThreshold, settings.criticalThreshold);
+    if (!runtimeConfig->save()) {
+        sendErrorResponse(request, 500, "Failed to persist thresholds");
+        return;
+    }
+
+    String json = "{\"success\":true,\"message\":\"Thresholds updated\",";
+    json += "\"warning\":" + String(settings.warningThreshold, 2) + ",";
+    json += "\"critical\":" + String(settings.criticalThreshold, 2);
+    json += "}";
+    sendJsonResponse(request, 200, json);
 }
 
 void RestAPI::handlePostMLTrain(AsyncWebServerRequest* request, uint8_t* data, size_t len) {
@@ -358,6 +450,28 @@ void RestAPI::handlePostMLPredict(AsyncWebServerRequest* request, uint8_t* data,
     } else {
         sendErrorResponse(request, 500, "ML engine not available");
     }
+}
+
+void RestAPI::handlePostAcknowledgeAlerts(AsyncWebServerRequest* request) {
+    if (!authenticateRequest(request)) {
+        sendErrorResponse(request, 401, "Unauthorized");
+        return;
+    }
+
+    if (!alertManager) {
+        sendErrorResponse(request, 500, "Alert manager not available");
+        return;
+    }
+
+    if (request->hasParam("id")) {
+        int id = request->getParam("id")->value().toInt();
+        alertManager->acknowledgealert(id);
+        sendJsonResponse(request, 200, "{\"success\":true,\"message\":\"Alert acknowledged\"}");
+        return;
+    }
+
+    alertManager->acknowledgeAll();
+    sendJsonResponse(request, 200, "{\"success\":true,\"message\":\"All alerts acknowledged\"}");
 }
 
 void RestAPI::handleDeleteAlert(AsyncWebServerRequest* request) {
@@ -404,12 +518,21 @@ void RestAPI::handleGetHistory(AsyncWebServerRequest* request) {
         return;
     }
 
+    if (!dataBuffer) {
+        sendErrorResponse(request, 500, "History buffer not available");
+        return;
+    }
+
     int limit = 100;
     if (request->hasParam("limit")) {
         limit = request->getParam("limit")->value().toInt();
     }
+    if (limit < 1) limit = 1;
+    if (limit > (int)dataBuffer->getMaxSize()) {
+        limit = (int)dataBuffer->getMaxSize();
+    }
 
-    String json = "{\"history\":[],\"count\":0,\"limit\":" + String(limit) + "}";
+    String json = dataBuffer->exportToJSON(dataBuffer->getSize() > (size_t)limit ? dataBuffer->getSize() - limit : 0, limit);
     sendJsonResponse(request, 200, json);
 }
 
@@ -419,12 +542,53 @@ void RestAPI::handleGetBaseline(AsyncWebServerRequest* request) {
         return;
     }
 
-    String json = "{\"baseline\":{";
-    json += "\"rms\":0.5,";
-    json += "\"kurtosis\":3.0,";
-    json += "\"crestFactor\":4.0,";
-    json += "\"dominantFreq\":50.0";
-    json += "},\"calibrated\":true}";
+    if (!faultDetector) {
+        sendErrorResponse(request, 500, "Fault detector not available");
+        return;
+    }
+
+    const BaselineStats& baseline = faultDetector->getBaseline();
+    String json = "{\"calibrated\":" + String(baseline.isCalibrated ? "true" : "false");
+    json += ",\"sampleCount\":" + String(baseline.sampleCount);
+    json += ",\"thresholds\":{";
+    json += "\"warning\":" + String(faultDetector->getWarningThreshold(), 2) + ",";
+    json += "\"critical\":" + String(faultDetector->getCriticalThreshold(), 2);
+    json += "},\"baseline\":{";
+
+    const char* keys[NUM_TOTAL_FEATURES] = {
+        "rms",
+        "peakToPeak",
+        "kurtosis",
+        "skewness",
+        "crestFactor",
+        "variance",
+        "spectralCentroid",
+        "spectralSpread",
+        "bandPowerRatio",
+        "dominantFreq"
+    };
+
+    json += "\"mean\":{";
+    for (int i = 0; i < NUM_TOTAL_FEATURES; i++) {
+        if (i > 0) json += ",";
+        json += "\"" + String(keys[i]) + "\":" + String(baseline.mean[i], 4);
+    }
+    json += "},\"stdDev\":{";
+    for (int i = 0; i < NUM_TOTAL_FEATURES; i++) {
+        if (i > 0) json += ",";
+        json += "\"" + String(keys[i]) + "\":" + String(baseline.stdDev[i], 4);
+    }
+    json += "},\"min\":{";
+    for (int i = 0; i < NUM_TOTAL_FEATURES; i++) {
+        if (i > 0) json += ",";
+        json += "\"" + String(keys[i]) + "\":" + String(baseline.min[i], 4);
+    }
+    json += "},\"max\":{";
+    for (int i = 0; i < NUM_TOTAL_FEATURES; i++) {
+        if (i > 0) json += ",";
+        json += "\"" + String(keys[i]) + "\":" + String(baseline.max[i], 4);
+    }
+    json += "}}";
     sendJsonResponse(request, 200, json);
 }
 
@@ -474,13 +638,28 @@ void RestAPI::handleGetExport(AsyncWebServerRequest* request) {
         return;
     }
 
+    if (!dataBuffer) {
+        sendErrorResponse(request, 500, "Export buffer not available");
+        return;
+    }
+
     String format = "json";
     if (request->hasParam("format")) {
         format = request->getParam("format")->value();
     }
 
-    String json = "{\"export\":{\"format\":\"" + format + "\",\"timestamp\":" + String(millis()) + "}}";
-    sendJsonResponse(request, 200, json);
+    if (format == "csv") {
+        request->send(200, "text/csv", dataBuffer->exportToCSV());
+        requestCount++;
+        return;
+    }
+
+    if (format == "json") {
+        sendJsonResponse(request, 200, dataBuffer->exportToJSON());
+        return;
+    }
+
+    sendErrorResponse(request, 400, "Unsupported export format");
 }
 
 String RestAPI::generateStatusJson() {
@@ -488,8 +667,16 @@ String RestAPI::generateStatusJson() {
     json += "\"status\":\"running\",";
     json += "\"uptime\":" + String(millis()) + ",";
     json += "\"faultDetected\":" + String(latestFault.type != FAULT_NONE ? "true" : "false") + ",";
-    json += "\"faultType\":\"" + String((int)latestFault.type) + "\",";
-    json += "\"severity\":\"" + String((int)latestFault.severity) + "\",";
+    json += "\"faultType\":" + String((int)latestFault.type) + ",";
+    json += "\"severity\":" + String((int)latestFault.severity) + ",";
+    json += "\"calibrated\":" + String(faultDetector && faultDetector->isCalibrated() ? "true" : "false") + ",";
+    json += "\"wifiConnected\":" + String(WiFi.status() == WL_CONNECTED ? "true" : "false") + ",";
+    json += "\"provisioningActive\":" + String(wifiManager && wifiManager->isProvisioningActive() ? "true" : "false") + ",";
+    json += "\"provisioningSsid\":\"" + String(wifiManager ? wifiManager->getProvisioningSSID() : "") + "\",";
+    json += "\"networkIp\":\"" + String(wifiManager ? wifiManager->getIPAddress() : "") + "\",";
+    json += "\"mqttConnected\":" + String(mqttManager && mqttManager->isConnected() ? "true" : "false") + ",";
+    json += "\"alertsActive\":" + String(alertManager ? alertManager->getActiveAlertCount() : 0) + ",";
+    json += "\"historyDepth\":" + String(dataBuffer ? dataBuffer->getSize() : 0) + ",";
     json += "\"apiVersion\":\"" + String(REST_API_VERSION) + "\"";
     json += "}";
     return json;
@@ -566,20 +753,37 @@ String RestAPI::generateAlertsJson() {
 }
 
 String RestAPI::generateConfigJson() {
-    String json = "{\"config\":{";
-    json += "\"deviceId\":\"" + String(DEVICE_ID) + "\",";
-    json += "\"sampleRate\":" + String(SAMPLING_FREQUENCY_HZ) + ",";
-    json += "\"windowSize\":" + String(WINDOW_SIZE) + ",";
-    json += "\"fftSize\":" + String(FFT_SIZE) + ",";
-    json += "\"mqttEnabled\":true,";
-    json += "\"mqttBroker\":\"" + String(MQTT_BROKER_ADDRESS) + "\",";
-    json += "\"mqttPort\":" + String(MQTT_BROKER_PORT);
-    json += "}}";
-    return json;
+    DynamicJsonDocument doc(2048);
+
+    JsonObject config = doc.createNestedObject("config");
+    if (runtimeConfig) {
+        runtimeConfig->populateJson(config, false);
+    }
+
+    JsonObject sampling = config.createNestedObject("sampling");
+    sampling["sampleRateHz"] = SAMPLING_FREQUENCY_HZ;
+    sampling["windowSize"] = WINDOW_SIZE;
+    sampling["fftSize"] = FFT_SIZE;
+    sampling["overlapPercent"] = OVERLAP_PERCENTAGE;
+
+    JsonObject provisioning = config.createNestedObject("provisioning");
+    provisioning["active"] = wifiManager && wifiManager->isProvisioningActive();
+    provisioning["ssid"] = wifiManager ? wifiManager->getProvisioningSSID() : "";
+    provisioning["ip"] = wifiManager ? wifiManager->getProvisioningIP() : "";
+
+    String output;
+    serializeJson(doc, output);
+    return output;
 }
 
 String RestAPI::generateSystemInfoJson() {
     String json = "{\"system\":{";
+    if (runtimeConfig) {
+        const RuntimeSettings& settings = runtimeConfig->getSettings();
+        json += "\"deviceName\":\"" + String(settings.deviceName) + "\",";
+        json += "\"deviceId\":\"" + String(settings.deviceId) + "\",";
+    }
+    json += "\"firmwareVersion\":\"" + String(FIRMWARE_VERSION) + "\",";
     json += "\"chipModel\":\"" + String(ESP.getChipModel()) + "\",";
     json += "\"chipRevision\":" + String(ESP.getChipRevision()) + ",";
     json += "\"cpuFreqMHz\":" + String(ESP.getCpuFreqMHz()) + ",";
@@ -588,6 +792,8 @@ String RestAPI::generateSystemInfoJson() {
     json += "\"flashSize\":" + String(ESP.getFlashChipSize()) + ",";
     json += "\"sketchSize\":" + String(ESP.getSketchSize()) + ",";
     json += "\"freeSketchSpace\":" + String(ESP.getFreeSketchSpace()) + ",";
+    json += "\"networkIp\":\"" + String(wifiManager ? wifiManager->getIPAddress() : "") + "\",";
+    json += "\"provisioningSsid\":\"" + String(wifiManager ? wifiManager->getProvisioningSSID() : "") + "\",";
     json += "\"sdkVersion\":\"" + String(ESP.getSdkVersion()) + "\"";
     json += "}}";
     return json;
@@ -599,6 +805,10 @@ String RestAPI::generateHealthJson() {
     json += "\"uptime\":" + String(millis()) + ",";
     json += "\"freeHeap\":" + String(ESP.getFreeHeap()) + ",";
     json += "\"wifiConnected\":" + String(WiFi.status() == WL_CONNECTED ? "true" : "false") + ",";
+    json += "\"provisioningActive\":" + String(wifiManager && wifiManager->isProvisioningActive() ? "true" : "false") + ",";
+    json += "\"networkIp\":\"" + String(wifiManager ? wifiManager->getIPAddress() : "") + "\",";
+    json += "\"mqttConnected\":" + String(mqttManager && mqttManager->isConnected() ? "true" : "false") + ",";
+    json += "\"historyDepth\":" + String(dataBuffer ? dataBuffer->getSize() : 0) + ",";
     json += "\"rssi\":" + String(WiFi.RSSI());
     json += "}}";
     return json;

@@ -59,15 +59,19 @@ class DeploymentJob:
 
 class DeploymentManager:
 
-    def __init__(self, models_dir: str='./models', registry_file: str='./models/registry.json'):
+    def __init__(self, models_dir: str='./models', registry_file: str='./models/registry.json',
+                 state_file: str=None):
         self.models_dir = Path(models_dir)
         self.models_dir.mkdir(parents=True, exist_ok=True)
         self.registry_file = Path(registry_file)
+        self.state_file = Path(state_file) if state_file else (self.registry_file.parent / 'deployments.json')
+        self.state_file.parent.mkdir(parents=True, exist_ok=True)
         self.registry: Dict[str, DeployedModel] = {}
         self.production_version: Optional[str] = None
         self.deployments: Dict[str, DeploymentJob] = {}
         self.device_status: Dict[str, DeviceDeployment] = {}
         self._load_registry()
+        self._load_state()
         self.notify_device: Optional[callable] = None
 
     def _load_registry(self):
@@ -86,15 +90,84 @@ class DeploymentManager:
         with open(self.registry_file, 'w') as f:
             json.dump(data, f, indent=2)
 
+    def _load_state(self):
+        if not self.state_file.exists():
+            return
+
+        with open(self.state_file) as f:
+            data = json.load(f)
+
+        self.deployments = {
+            item['deployment_id']: DeploymentJob(
+                deployment_id=item['deployment_id'],
+                model_version=item['model_version'],
+                target_devices=item.get('target_devices', []),
+                status=DeploymentStatus(item['status']),
+                created_at=datetime.fromisoformat(item['created_at']),
+                completed_at=datetime.fromisoformat(item['completed_at']) if item.get('completed_at') else None,
+                success_count=item.get('success_count', 0),
+                failure_count=item.get('failure_count', 0),
+            )
+            for item in data.get('deployments', [])
+        }
+
+        self.device_status = {
+            item['device_id']: DeviceDeployment(
+                device_id=item['device_id'],
+                target_version=item.get('target_version', ''),
+                current_version=item.get('current_version', ''),
+                status=DeviceUpdateStatus(item['status']),
+                notified_at=datetime.fromisoformat(item['notified_at']) if item.get('notified_at') else None,
+                completed_at=datetime.fromisoformat(item['completed_at']) if item.get('completed_at') else None,
+                error_message=item.get('error_message', ''),
+            )
+            for item in data.get('device_status', [])
+        }
+
+    def _save_state(self):
+        data = {
+            'deployments': [
+                {
+                    'deployment_id': deployment.deployment_id,
+                    'model_version': deployment.model_version,
+                    'target_devices': deployment.target_devices,
+                    'status': deployment.status.value,
+                    'created_at': deployment.created_at.isoformat(),
+                    'completed_at': deployment.completed_at.isoformat() if deployment.completed_at else None,
+                    'success_count': deployment.success_count,
+                    'failure_count': deployment.failure_count,
+                }
+                for deployment in self.deployments.values()
+            ],
+            'device_status': [
+                {
+                    'device_id': device.device_id,
+                    'target_version': device.target_version,
+                    'current_version': device.current_version,
+                    'status': device.status.value,
+                    'notified_at': device.notified_at.isoformat() if device.notified_at else None,
+                    'completed_at': device.completed_at.isoformat() if device.completed_at else None,
+                    'error_message': device.error_message,
+                }
+                for device in self.device_status.values()
+            ],
+        }
+        with open(self.state_file, 'w') as f:
+            json.dump(data, f, indent=2)
+
     def register_model(self, model_path: str, version: str, accuracy: float=0.0, metadata: Dict=None) -> DeployedModel:
         source_path = Path(model_path)
         if not source_path.exists():
             raise FileNotFoundError(f'Model not found: {model_path}')
-        dest_path = self.models_dir / f'model_{version}.tflite'
-        shutil.copy2(source_path, dest_path)
+        extension = source_path.suffix or '.bin'
+        dest_path = self.models_dir / f'model_{version}{extension}'
+        if source_path.resolve() != dest_path.resolve():
+            shutil.copy2(source_path, dest_path)
         with open(dest_path, 'rb') as f:
             file_hash = hashlib.sha256(f.read()).hexdigest()
-        model = DeployedModel(version=version, file_path=str(dest_path), size_bytes=dest_path.stat().st_size, hash_sha256=file_hash, created_at=datetime.now(), accuracy=accuracy, metadata=metadata)
+        merged_metadata = dict(metadata or {})
+        merged_metadata.setdefault('artifact_suffix', extension)
+        model = DeployedModel(version=version, file_path=str(dest_path.resolve()), size_bytes=dest_path.stat().st_size, hash_sha256=file_hash, created_at=datetime.now(), accuracy=accuracy, metadata=merged_metadata)
         self.registry[version] = model
         self._save_registry()
         logger.info(f'Registered model version {version}')
@@ -108,6 +181,7 @@ class DeploymentManager:
         self.deployments[deployment_id] = deployment
         self._set_production(version)
         self._start_rollout(deployment)
+        self._save_state()
         return deployment_id
 
     def _set_production(self, version: str):
@@ -122,11 +196,15 @@ class DeploymentManager:
         deployment.status = DeploymentStatus.ROLLING_OUT
         model = self.registry[deployment.model_version]
         update_info = {'type': 'model_update', 'version': deployment.model_version, 'size': model.size_bytes, 'hash': model.hash_sha256, 'accuracy': model.accuracy, 'download_url': self._get_download_url(deployment.model_version)}
+        devices = deployment.target_devices or self._get_all_devices()
         if self.notify_device:
-            devices = deployment.target_devices or self._get_all_devices()
             for device_id in devices:
                 self._notify_device_update(device_id, update_info)
                 self.device_status[device_id] = DeviceDeployment(device_id=device_id, target_version=deployment.model_version, current_version='', status=DeviceUpdateStatus.NOTIFIED, notified_at=datetime.now())
+        if not devices:
+            deployment.status = DeploymentStatus.COMPLETED
+            deployment.completed_at = datetime.now()
+        self._save_state()
         logger.info(f'Started rollout of {deployment.model_version}')
 
     def _notify_device_update(self, device_id: str, update_info: Dict):
@@ -156,9 +234,10 @@ class DeploymentManager:
             device.error_message = error
         if device.status == DeviceUpdateStatus.COMPLETED:
             device.completed_at = datetime.now()
-            self._check_deployment_completion()
         elif device.status == DeviceUpdateStatus.FAILED:
-            self._check_deployment_completion()
+            device.completed_at = datetime.now()
+        self._check_deployment_completion()
+        self._save_state()
 
     def _check_deployment_completion(self):
         for deployment in self.deployments.values():
@@ -180,12 +259,10 @@ class DeploymentManager:
             deployment.success_count = success
             deployment.failure_count = failure
             if pending == 0:
-                if failure == 0:
-                    deployment.status = DeploymentStatus.COMPLETED
-                else:
-                    deployment.status = DeploymentStatus.COMPLETED
+                deployment.status = DeploymentStatus.COMPLETED if failure == 0 else DeploymentStatus.FAILED
                 deployment.completed_at = datetime.now()
                 logger.info(f'Deployment {deployment.deployment_id} completed: {success} success, {failure} failed')
+        self._save_state()
 
     def rollback(self, to_version: str=None) -> bool:
         if to_version is None:
@@ -206,6 +283,11 @@ class DeploymentManager:
             return None
         model = self.registry[version]
         return {'version': model.version, 'file_path': model.file_path, 'size_bytes': model.size_bytes, 'hash': model.hash_sha256, 'created_at': model.created_at.isoformat(), 'deployed_at': model.deployed_at.isoformat() if model.deployed_at else None, 'accuracy': model.accuracy, 'is_production': model.is_production, 'metadata': model.metadata}
+
+    def get_model_file_path(self, version: str) -> Optional[str]:
+        if version not in self.registry:
+            return None
+        return self.registry[version].file_path
 
     def get_production_model(self) -> Optional[Dict]:
         if self.production_version:

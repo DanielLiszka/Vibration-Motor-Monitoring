@@ -28,5 +28,14 @@ jobs:
       - name: Install PlatformIO
         run: python -m pip install --upgrade pip platformio
 
+      - name: Install Python test dependencies
+        run: python -m pip install -r cloud/requirements-test.txt
+
       - name: Build firmware
         run: pio run -e esp32dev
+
+      - name: Build SPIFFS image
+        run: pio run -e esp32dev -t buildfs
+
+      - name: Run Python regression tests
+        run: pytest -q tests_py cloud/tests

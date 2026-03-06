@@ -1,20 +1,28 @@
 #include "StorageManager.h"
 
+namespace {
+bool g_storageMounted = false;
+}
+
 StorageManager::StorageManager() : initialized(false) {
 }
 
 StorageManager::~StorageManager() {
-    if (initialized) {
-        SPIFFS.end();
-    }
 }
 
 bool StorageManager::begin() {
+    if (initialized) {
+        return true;
+    }
+
     DEBUG_PRINTLN("Initializing Storage Manager...");
 
-    if (!SPIFFS.begin(STORAGE_FORMAT_ON_FAIL)) {
-        DEBUG_PRINTLN("SPIFFS mount failed");
-        return false;
+    if (!g_storageMounted) {
+        if (!SPIFFS.begin(STORAGE_FORMAT_ON_FAIL)) {
+            DEBUG_PRINTLN("SPIFFS mount failed");
+            return false;
+        }
+        g_storageMounted = true;
     }
 
     ensureDirectory(STORAGE_LOG_PATH);

@@ -22,6 +22,7 @@ CloudConnector::CloudConnector()
     memset(&stats, 0, sizeof(stats));
     memset(pendingModelVersion, 0, sizeof(pendingModelVersion));
     memset(pendingModelUrl, 0, sizeof(pendingModelUrl));
+    memset(pendingModelHash, 0, sizeof(pendingModelHash));
     instance = this;
 }
 
@@ -75,6 +76,7 @@ bool CloudConnector::begin(const CloudConfig& config) {
 void CloudConnector::clearPendingModelUpdate() {
     pendingModelVersion[0] = '\0';
     pendingModelUrl[0] = '\0';
+    pendingModelHash[0] = '\0';
     modelUpdateAvailable = false;
 }
 
@@ -261,11 +263,17 @@ void CloudConnector::handleMessage(const char* topic, const uint8_t* payload, si
             DeserializationError err = deserializeJson(doc, payload, length);
             if (!err) {
                 const char* version = doc["version"] | doc["model_version"] | "";
-                const char* url = doc["url"] | doc["model_url"] | "";
+                const char* url = doc["url"] | doc["model_url"] | doc["download_url"] | "";
+                const char* hash = doc["hash"] | doc["sha256"] | "";
 
                 if (version && version[0] && url && url[0]) {
                     strncpy(pendingModelVersion, version, sizeof(pendingModelVersion) - 1);
                     strncpy(pendingModelUrl, url, sizeof(pendingModelUrl) - 1);
+                    if (hash) {
+                        strncpy(pendingModelHash, hash, sizeof(pendingModelHash) - 1);
+                    } else {
+                        pendingModelHash[0] = '\0';
+                    }
                     modelUpdateAvailable = true;
                 }
             }

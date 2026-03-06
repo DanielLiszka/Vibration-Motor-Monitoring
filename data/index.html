@@ -5,15 +5,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Motor Vibration Monitor</title>
     <link rel="stylesheet" href="style.css">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
     <header>
         <div class="header-content">
-            <h1>Motor Vibration Monitor</h1>
+            <div>
+                <h1>Motor Vibration Monitor</h1>
+                <p id="status-message" class="status-message">Connecting to device...</p>
+            </div>
             <div class="status-bar">
                 <span id="connection-status" class="status disconnected">Disconnected</span>
-                <span id="device-id" class="device-id"></span>
+                <span id="device-id" class="device-id">--</span>
             </div>
         </div>
     </header>
@@ -21,7 +23,7 @@
     <nav class="nav-tabs">
         <button class="nav-tab active" data-tab="dashboard">Dashboard</button>
         <button class="nav-tab" data-tab="spectrum">Spectrum</button>
-        <button class="nav-tab" data-tab="trends">Trends</button>
+        <button class="nav-tab" data-tab="trends">History</button>
         <button class="nav-tab" data-tab="alerts">Alerts</button>
         <button class="nav-tab" data-tab="config">Settings</button>
     </nav>
@@ -37,8 +39,9 @@
                     </div>
                     <div class="fault-details">
                         <p>Confidence: <span id="fault-confidence">0</span>%</p>
-                        <p>Severity: <span id="fault-severity">None</span></p>
+                        <p>Severity: <span id="fault-severity">NORMAL</span></p>
                     </div>
+                    <p id="fault-description" class="card-subtext">No active fault</p>
                 </div>
 
                 <div class="card metrics-card">
@@ -66,7 +69,7 @@
                 </div>
 
                 <div class="card chart-card">
-                    <h2>Real-Time Signal</h2>
+                    <h2>Live RMS Trace</h2>
                     <canvas id="signal-chart"></canvas>
                 </div>
 
@@ -95,6 +98,14 @@
                             <span class="status-label">Uptime</span>
                             <span id="uptime" class="status-value">0:00:00</span>
                         </div>
+                        <div class="status-item">
+                            <span class="status-label">Mode</span>
+                            <span id="system-mode" class="status-value">BOOT</span>
+                        </div>
+                        <div class="status-item">
+                            <span class="status-label">Calibrated</span>
+                            <span id="calibrated-status" class="status-value">No</span>
+                        </div>
                     </div>
                 </div>
 
@@ -122,65 +133,30 @@
             <div class="card full-width">
                 <h2>Frequency Spectrum</h2>
                 <canvas id="spectrum-chart"></canvas>
-                <div class="spectrum-controls">
-                    <label>
-                        Scale:
-                        <select id="spectrum-scale">
-                            <option value="linear">Linear</option>
-                            <option value="log">Logarithmic</option>
-                        </select>
-                    </label>
-                    <label>
-                        Window:
-                        <select id="window-type">
-                            <option value="0">Hanning</option>
-                            <option value="1">Hamming</option>
-                            <option value="2">Blackman</option>
-                        </select>
-                    </label>
-                </div>
+                <p class="card-subtext">Live FFT magnitude from the current vibration window.</p>
             </div>
         </section>
 
         <section id="trends" class="tab-content">
             <div class="card full-width">
-                <h2>Historical Trends</h2>
+                <h2>Recent History</h2>
                 <canvas id="trend-chart"></canvas>
-                <div class="trend-controls">
-                    <label>
-                        Time Range:
-                        <select id="trend-range">
-                            <option value="1h">Last Hour</option>
-                            <option value="6h">Last 6 Hours</option>
-                            <option value="24h">Last 24 Hours</option>
-                            <option value="7d">Last 7 Days</option>
-                        </select>
-                    </label>
-                    <label>
-                        Metric:
-                        <select id="trend-metric">
-                            <option value="rms">RMS</option>
-                            <option value="kurtosis">Kurtosis</option>
-                            <option value="crestFactor">Crest Factor</option>
-                            <option value="dominantFreq">Dominant Frequency</option>
-                        </select>
-                    </label>
-                </div>
+                <p class="card-subtext">Loaded from the on-device history buffer.</p>
             </div>
             <div class="grid-container">
                 <div class="card">
                     <h3>Trend Analysis</h3>
                     <div id="trend-analysis">
                         <p>Status: <span id="trend-status">Stable</span></p>
-                        <p>Direction: <span id="trend-direction">—</span></p>
-                        <p>Rate of Change: <span id="trend-rate">0.00/hr</span></p>
+                        <p>Direction: <span id="trend-direction">Flat</span></p>
+                        <p>Rate of Change: <span id="trend-rate">0.00/window</span></p>
                     </div>
                 </div>
                 <div class="card">
-                    <h3>Predictions</h3>
+                    <h3>Buffer Summary</h3>
                     <div id="predictions">
-                        <p>Next Maintenance: <span id="next-maintenance">--</span></p>
-                        <p>Estimated Degradation: <span id="degradation">Normal</span></p>
+                        <p>History Depth: <span id="history-depth">0</span></p>
+                        <p>Buffer Usage: <span id="buffer-usage">0 samples</span></p>
                     </div>
                 </div>
             </div>
@@ -203,50 +179,77 @@
 
         <section id="config" class="tab-content">
             <div class="grid-container">
-                <div class="card">
-                    <h2>Device Configuration</h2>
-                    <form id="config-form">
+                <div class="card full-width">
+                    <h2>Device Settings</h2>
+                    <form id="settings-form" class="form-grid">
                         <div class="form-group">
                             <label for="device-name">Device Name</label>
-                            <input type="text" id="device-name" value="motor-vibration-monitor-001">
+                            <input type="text" id="device-name">
                         </div>
                         <div class="form-group">
-                            <label for="sample-rate">Sample Rate (Hz)</label>
-                            <input type="number" id="sample-rate" value="100">
+                            <label for="device-id-input">Device ID</label>
+                            <input type="text" id="device-id-input">
                         </div>
                         <div class="form-group">
-                            <label for="window-size">Window Size</label>
-                            <input type="number" id="window-size" value="256">
-                        </div>
-                        <button type="submit" class="btn btn-primary">Save Configuration</button>
-                    </form>
-                </div>
-
-                <div class="card">
-                    <h2>Threshold Settings</h2>
-                    <form id="threshold-form">
-                        <div class="form-group">
-                            <label for="rms-warning">RMS Warning Level</label>
-                            <input type="number" step="0.1" id="rms-warning" value="1.5">
+                            <label for="broadcast-interval">Dashboard Broadcast Interval (ms)</label>
+                            <input type="number" id="broadcast-interval" min="100" max="5000">
                         </div>
                         <div class="form-group">
-                            <label for="rms-critical">RMS Critical Level</label>
-                            <input type="number" step="0.1" id="rms-critical" value="2.5">
+                            <label for="warning-threshold">Warning Threshold</label>
+                            <input type="number" step="0.1" id="warning-threshold">
                         </div>
                         <div class="form-group">
-                            <label for="kurtosis-warning">Kurtosis Warning Level</label>
-                            <input type="number" step="0.1" id="kurtosis-warning" value="5.0">
+                            <label for="critical-threshold">Critical Threshold</label>
+                            <input type="number" step="0.1" id="critical-threshold">
                         </div>
-                        <button type="submit" class="btn btn-primary">Save Thresholds</button>
+                        <div class="form-group checkbox-row">
+                            <label><input type="checkbox" id="wifi-enabled"> Enable WiFi</label>
+                        </div>
+                        <div class="form-group">
+                            <label for="wifi-ssid">WiFi SSID</label>
+                            <input type="text" id="wifi-ssid">
+                        </div>
+                        <div class="form-group">
+                            <label for="wifi-password">WiFi Password</label>
+                            <input type="password" id="wifi-password" placeholder="Leave blank to keep current password">
+                        </div>
+                        <div class="form-group checkbox-row">
+                            <label><input type="checkbox" id="mqtt-enabled"> Enable MQTT</label>
+                        </div>
+                        <div class="form-group">
+                            <label for="mqtt-broker">MQTT Broker</label>
+                            <input type="text" id="mqtt-broker">
+                        </div>
+                        <div class="form-group">
+                            <label for="mqtt-port">MQTT Port</label>
+                            <input type="number" id="mqtt-port" min="1" max="65535">
+                        </div>
+                        <div class="form-group">
+                            <label for="mqtt-user">MQTT User</label>
+                            <input type="text" id="mqtt-user">
+                        </div>
+                        <div class="form-group">
+                            <label for="mqtt-password">MQTT Password</label>
+                            <input type="password" id="mqtt-password" placeholder="Leave blank to keep current password">
+                        </div>
+                        <div class="form-group checkbox-row">
+                            <label><input type="checkbox" id="ota-enabled"> Enable OTA</label>
+                        </div>
+                        <div class="form-group">
+                            <label for="ota-password">OTA Password</label>
+                            <input type="password" id="ota-password" placeholder="Leave blank to keep current password">
+                        </div>
+                        <button type="submit" class="btn btn-primary">Save Settings</button>
                     </form>
                 </div>
 
                 <div class="card">
                     <h2>Actions</h2>
                     <div class="action-buttons">
-                        <button id="calibrate-btn" class="btn btn-primary">Calibrate Baseline</button>
-                        <button id="export-btn" class="btn btn-secondary">Export Data</button>
-                        <button id="reset-btn" class="btn btn-danger">Reset Device</button>
+                        <button id="calibrate-btn" class="btn btn-primary" type="button">Calibrate Baseline</button>
+                        <button id="export-json-btn" class="btn btn-secondary" type="button">Export JSON</button>
+                        <button id="export-btn" class="btn btn-secondary" type="button">Export CSV</button>
+                        <button id="reset-btn" class="btn btn-danger" type="button">Reset Device</button>
                     </div>
                 </div>
 
@@ -257,6 +260,7 @@
                         <p>Chip Model: <span id="chip-model">--</span></p>
                         <p>Flash Size: <span id="flash-size">--</span></p>
                         <p>Free Heap: <span id="free-heap-info">--</span></p>
+                        <p>API Version: <span id="api-version">--</span></p>
                     </div>
                 </div>
             </div>
@@ -267,6 +271,6 @@
         <p>Motor Vibration Monitor</p>
     </footer>
 
-    <script src="app.js"></script>
+    <script src="dashboard.js"></script>
 </body>
 </html>

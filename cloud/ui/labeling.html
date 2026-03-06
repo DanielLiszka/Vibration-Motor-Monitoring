@@ -188,7 +188,8 @@
             <div class="task-panel">
                 <div id="task-content">
                     <div class="empty-state">
-                        <p>Click "Load Next Task" to start labeling</p>
+                        <p>Loading labeling tasks...</p>
+                        <button class="btn btn-secondary" onclick="loadNextTask()">Load Next Task</button>
                     </div>
                 </div>
 
@@ -251,6 +252,19 @@
                     selectedLabel = null;
                     renderTask(currentTask);
                 } else {
+                    await fetch(`${API_BASE}/create-batch`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ num_samples: 20, strategy: 'uncertainty' })
+                    });
+                    const retryResp = await fetch(`${API_BASE}/next?labeler_id=web_user`);
+                    const retryData = await retryResp.json();
+                    if (retryData.status === 'ok' && retryData.task) {
+                        currentTask = retryData.task;
+                        selectedLabel = null;
+                        renderTask(currentTask);
+                        return;
+                    }
                     document.getElementById('task-content').innerHTML = `
                         <div class="empty-state">
                             <p>No more tasks available!</p>
@@ -405,6 +419,7 @@
 
 
         loadStats();
+        loadNextTask();
         setInterval(loadStats, 30000);
     </script>
 </body>

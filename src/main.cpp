@@ -32,6 +32,7 @@
 #include "OnlineLearner.h"
 #include "DriftDetector.h"
 #include "SelfCalibratingModel.h"
+#include "RuntimeConfig.h"
 #include <ArduinoJson.h>
 
 MPU6050Driver sensor;
@@ -66,6 +67,7 @@ OnlineLearner onlineLearner;
 DriftDetector driftDetector;
 SelfCalibratingModel selfCalibModel;
 ContinuousLearningManager clManager;
+RuntimeConfigManager runtimeConfig;
 
 enum SystemState {
     STATE_INIT,
@@ -82,6 +84,24 @@ uint32_t totalSamples = 0;
 uint32_t faultsDetected = 0;
 uint32_t loopCounter = 0;
 volatile bool calibrationRequestPending = false;
+
+static const RuntimeSettings& getRuntimeSettings() {
+    return runtimeConfig.getSettings();
+}
+
+static bool isNetworkEnabled() {
+    return getRuntimeSettings().wifiEnabled;
+}
+
+static bool isMqttEnabled() {
+    const RuntimeSettings& settings = getRuntimeSettings();
+    return settings.wifiEnabled && settings.mqttEnabled;
+}
+
+static bool isOtaEnabled() {
+    const RuntimeSettings& settings = getRuntimeSettings();
+    return settings.wifiEnabled && settings.otaEnabled;
+}
 
 void setup();
 void loop();
@@ -147,12 +167,14 @@ void loop() {
 
             monitorVibration();
 
-            if (WIFI_ENABLED) {
+            if (isNetworkEnabled()) {
                 wifiMgr.loop();
                 webServer.loop();
                 mqttMgr.loop();
                 cloudConnector.loop();
-                otaUpdater.loop();
+                if (isOtaEnabled()) {
+                    otaUpdater.loop();
+                }
             }
 
             sysHardening.loop();
@@ -201,6 +223,17 @@ void loop() {
 void initializeSystem() {
     DEBUG_PRINTLN("\n=== Initializing System ===\n");
 
+    DEBUG_PRINTLN("0. Initializing Storage Manager...");
+    if (storageMgr.begin()) {
+        DEBUG_PRINTLN("   [OK] Storage Manager\n");
+    } else {
+        DEBUG_PRINTLN("   ⚠ Storage Manager failed\n");
+    }
+
+    DEBUG_PRINTLN("0b. Loading Runtime Configuration...");
+    runtimeConfig.begin();
+    DEBUG_PRINTF("   [OK] Device ID: %s\n\n", getRuntimeSettings().deviceId);
+
     DEBUG_PRINTLN("1. Initializing MPU6050 sensor...");
     if (!sensor.begin()) {
         handleError("MPU6050 initialization failed: " + sensor.getLastError());
@@ -222,6 +255,8 @@ void initializeSystem() {
         handleError("Fault detector initialization failed");
         return;
     }
+    faultDetect.setThresholds(getRuntimeSettings().warningThreshold,
+                              getRuntimeSettings().criticalThreshold);
     DEBUG_PRINTLN("   [OK] Fault Detector\n");
     blinkLED(1);
 
@@ -233,23 +268,35 @@ void initializeSystem() {
     DEBUG_PRINTLN("   [OK] Data Logger\n");
     blinkLED(1);
 
-    if (WIFI_ENABLED) {
+    if (isNetworkEnabled()) {
+        const RuntimeSettings& settings = getRuntimeSettings();
         DEBUG_PRINTLN("5. Initializing WiFi...");
-        if (wifiMgr.begin()) {
-            DEBUG_PRINTLN("   [OK] WiFi\n");
+        if (wifiMgr.begin(settings.wifiSsid, settings.wifiPassword)) {
+            if (wifiMgr.isWiFiConnected()) {
+                DEBUG_PRINTLN("   [OK] WiFi\n");
+            } else if (wifiMgr.isProvisioningActive()) {
+                DEBUG_PRINTF("   [OK] Provisioning AP active: %s (%s)\n\n",
+                             wifiMgr.getProvisioningSSID().c_str(),
+                             wifiMgr.getProvisioningIP().c_str());
+            }
             blinkLED(2);
 
             DEBUG_PRINTLN("6. Initializing Web Server...");
             if (webServer.begin()) {
+                webServer.setBroadcastInterval(settings.webBroadcastIntervalMs);
                 DEBUG_PRINTLN("   [OK] Web Server\n");
                 blinkLED(1);
             } else {
                 DEBUG_PRINTLN("   ⚠ Web Server failed\n");
             }
 
-            if (MQTT_ENABLED) {
+            if (wifiMgr.isWiFiConnected() && settings.mqttEnabled) {
                 DEBUG_PRINTLN("7. Initializing MQTT...");
-                if (mqttMgr.begin(MQTT_BROKER_ADDRESS, MQTT_BROKER_PORT, DEVICE_ID)) {
+                if (mqttMgr.begin(settings.mqttBroker,
+                                  settings.mqttPort,
+                                  settings.deviceId,
+                                  settings.mqttUser,
+                                  settings.mqttPassword)) {
                     DEBUG_PRINTLN("   [OK] MQTT\n");
                     blinkLED(1);
                 } else {
@@ -260,13 +307,13 @@ void initializeSystem() {
                 CloudConfig cloudConfig;
                 memset(&cloudConfig, 0, sizeof(cloudConfig));
                 cloudConfig.provider = CLOUD_GENERIC_MQTT;
-                strncpy(cloudConfig.endpoint, MQTT_BROKER_ADDRESS, sizeof(cloudConfig.endpoint) - 1);
-                cloudConfig.port = MQTT_BROKER_PORT;
+                strncpy(cloudConfig.endpoint, settings.mqttBroker, sizeof(cloudConfig.endpoint) - 1);
+                cloudConfig.port = settings.mqttPort;
 
-                String cloudClientId = String(DEVICE_ID) + "-cloud";
+                String cloudClientId = String(settings.deviceId) + "-cloud";
                 strncpy(cloudConfig.deviceId, cloudClientId.c_str(), sizeof(cloudConfig.deviceId) - 1);
-                strncpy(cloudConfig.username, MQTT_USER, sizeof(cloudConfig.username) - 1);
-                strncpy(cloudConfig.password, MQTT_PASSWORD, sizeof(cloudConfig.password) - 1);
+                strncpy(cloudConfig.username, settings.mqttUser, sizeof(cloudConfig.username) - 1);
+                strncpy(cloudConfig.password, settings.mqttPassword, sizeof(cloudConfig.password) - 1);
                 cloudConfig.useTLS = false;
 
                 cloudConnector.setWillMessage(
@@ -282,14 +329,22 @@ void initializeSystem() {
                 } else {
                     DEBUG_PRINTLN("   ⚠ Cloud Connector failed\n");
                 }
+            } else if (settings.mqttEnabled) {
+                DEBUG_PRINTLN("7. MQTT deferred until WiFi station connection is available\n");
             }
 
-            DEBUG_PRINTLN("8. Initializing OTA Updater...");
-            if (otaUpdater.begin(DEVICE_ID, OTA_PASSWORD)) {
-                DEBUG_PRINTLN("   [OK] OTA Updater\n");
-                blinkLED(1);
+            if (wifiMgr.isWiFiConnected() && settings.otaEnabled) {
+                DEBUG_PRINTLN("8. Initializing OTA Updater...");
+                if (otaUpdater.begin(settings.deviceId, settings.otaPassword)) {
+                    DEBUG_PRINTLN("   [OK] OTA Updater\n");
+                    blinkLED(1);
+                } else {
+                    DEBUG_PRINTLN("   ⚠ OTA Updater failed\n");
+                }
+            } else if (settings.otaEnabled) {
+                DEBUG_PRINTLN("8. OTA deferred until WiFi station connection is available\n");
             } else {
-                DEBUG_PRINTLN("   ⚠ OTA Updater failed\n");
+                DEBUG_PRINTLN("8. OTA Updater disabled in runtime settings\n");
             }
         } else {
             DEBUG_PRINTLN("   ⚠ WiFi initialization failed (continuing without WiFi)\n");
@@ -303,14 +358,8 @@ void initializeSystem() {
     DEBUG_PRINTLN("10. Initializing Data Buffer...");
     dataBuffer.setAutoExport(true);
     dataBuffer.setAutoExportInterval(300000);
+    dataBuffer.loadFromFile("/data_export.csv");
     DEBUG_PRINTLN("   [OK] Data Buffer\n");
-
-    DEBUG_PRINTLN("11. Initializing Storage Manager...");
-    if (storageMgr.begin()) {
-        DEBUG_PRINTLN("   [OK] Storage Manager\n");
-    } else {
-        DEBUG_PRINTLN("   ⚠ Storage Manager failed\n");
-    }
 
     DEBUG_PRINTLN("12. Initializing Trend Analyzer...");
     trendAnalyzer.begin();
@@ -439,25 +488,30 @@ void initializeSystem() {
         DEBUG_PRINTLN("   ⚠ Continuous Learning Manager failed\n");
     }
 
-    if (WIFI_ENABLED && webServer.getServer()) {
+    if (isNetworkEnabled() && webServer.getServer()) {
         DEBUG_PRINTLN("29. Initializing REST API...");
-        restApi = new RestAPI(webServer.getServer());
-        if (restApi->begin()) {
-            restApi->setFeatureExtractor(&featureExt);
-            restApi->setFaultDetector(&faultDetect);
-            restApi->setTrendAnalyzer(&trendAnalyzer);
-            restApi->setAlertManager(&alertMgr);
-            restApi->setEdgeML(&edgeML);
-            restApi->setPerformanceMonitor(&perfMon);
-            restApi->setCalibrationCallback([]() { calibrationRequestPending = true; });
-            DEBUG_PRINTLN("   [OK] REST API\n");
-        } else {
+            restApi = new RestAPI(webServer.getServer());
+            if (restApi->begin()) {
+                restApi->setFeatureExtractor(&featureExt);
+                restApi->setFaultDetector(&faultDetect);
+                restApi->setTrendAnalyzer(&trendAnalyzer);
+                restApi->setAlertManager(&alertMgr);
+                restApi->setEdgeML(&edgeML);
+                restApi->setPerformanceMonitor(&perfMon);
+                restApi->setDataBuffer(&dataBuffer);
+                restApi->setRuntimeConfig(&runtimeConfig);
+                restApi->setWebServerController(&webServer);
+                restApi->setMQTTManager(&mqttMgr);
+                restApi->setWiFiManager(&wifiMgr);
+                restApi->setCalibrationCallback([]() { calibrationRequestPending = true; });
+                DEBUG_PRINTLN("   [OK] REST API\n");
+            } else {
             DEBUG_PRINTLN("   ⚠ REST API failed\n");
         }
     }
 
     DEBUG_PRINTLN("30. Initializing Modbus Server...");
-    if (modbusServer.begin(true, false)) {
+    if (modbusServer.begin(isNetworkEnabled(), false)) {
         modbusServer.setCalibrationCallback([]() {
             calibrationRequestPending = true;
         });
@@ -470,7 +524,7 @@ void initializeSystem() {
     }
 
     DEBUG_PRINTLN("\n=== System Initialization Complete ===");
-    DEBUG_PRINTLN("Total Subsystems Initialized: 30\n");
+    DEBUG_PRINTLN("Core monitoring pipeline initialized\n");
     blinkLED(3, 100);
 }
 
@@ -556,10 +610,16 @@ void monitorVibration() {
     lastSampleTime = currentTime;
 
     AccelData accelData;
-    if (!sensor.readAcceleration(accelData)) {
+    ProfileTimer sensorTimer;
+    sensorTimer.start();
+    bool readOk = sensor.readAcceleration(accelData);
+    perfMon.recordSensorRead(sensorTimer.stop());
+    if (!readOk) {
+        perfMon.recordMissedSample();
         DEBUG_PRINTLN("Failed to read sensor");
         return;
     }
+    perfMon.incrementSamples();
 
     multiAxis.addSample(accelData.x, accelData.y, accelData.z);
 
@@ -583,11 +643,15 @@ void monitorVibration() {
 }
 
 void processVibrationData() {
-
+    ProfileTimer fftTimer;
+    fftTimer.start();
     if (!signalProc.performFFT(0)) {
+        perfMon.recordFFT(fftTimer.stop());
         DEBUG_PRINTLN("FFT failed");
         return;
     }
+    perfMon.recordFFT(fftTimer.stop());
+    perfMon.incrementFFTs();
 
     float spectrum[FFT_OUTPUT_SIZE];
     if (!signalProc.getMagnitudeSpectrum(spectrum, FFT_OUTPUT_SIZE)) {
@@ -596,6 +660,8 @@ void processVibrationData() {
     }
 
     FeatureVector features;
+    ProfileTimer featureTimer;
+    featureTimer.start();
     if (!featureExt.extractAllFeatures(
             signalProc.getBufferData(0),
             WINDOW_SIZE,
@@ -603,12 +669,18 @@ void processVibrationData() {
             FFT_OUTPUT_SIZE,
             &signalProc,
             features)) {
+        perfMon.recordFeatureExtract(featureTimer.stop());
         DEBUG_PRINTLN("Feature extraction failed");
         return;
     }
+    perfMon.recordFeatureExtract(featureTimer.stop());
 
     FaultResult faultResult;
+    ProfileTimer detectTimer;
+    detectTimer.start();
     bool faultDetected = faultDetect.detectFault(features, faultResult);
+    perfMon.recordFaultDetect(detectTimer.stop());
+    perfMon.incrementDetections();
 
     float temperature = sensor.getTemperature();
 
@@ -641,7 +713,7 @@ void processVibrationData() {
 
     float vibrationPowerLoss = energyMon.estimateVibrationPowerLoss(features);
 
-    if (WIFI_ENABLED) {
+    if (isNetworkEnabled()) {
         webServer.updateFeatures(features);
         webServer.updateFault(faultResult);
         webServer.updateSpectrum(spectrum, FFT_OUTPUT_SIZE);
@@ -676,7 +748,7 @@ void processVibrationData() {
                            faultResult.description,
                            "Anomaly score: " + String(faultResult.anomalyScore, 2));
 
-        if (MQTT_ENABLED && mqttMgr.isConnected()) {
+        if (isMqttEnabled() && mqttMgr.isConnected()) {
             mqttMgr.publishFault(faultResult);
             mqttMgr.publishAlert(faultResult.description.c_str(), faultResult.severity);
         }
@@ -691,7 +763,7 @@ void processVibrationData() {
     }
 
     static uint32_t lastMqttPublish = 0;
-    if (MQTT_ENABLED && mqttMgr.isConnected() &&
+    if (isMqttEnabled() && mqttMgr.isConnected() &&
         (millis() - lastMqttPublish > 5000)) {
         mqttMgr.publishFeatures(features);
         mqttMgr.publishSpectrum(spectrum, FFT_OUTPUT_SIZE);
@@ -740,10 +812,15 @@ void printSystemStatus() {
     Serial.printf("Faults Detected: %lu\n", faultsDetected);
     Serial.printf("Buffer Fill: %d%%\n", signalProc.getBufferFillLevel());
 
-    if (WIFI_ENABLED) {
+    if (isNetworkEnabled()) {
         Serial.printf("WiFi: %s (RSSI: %d dBm)\n",
                       wifiMgr.isWiFiConnected() ? "Connected" : "Disconnected",
                       wifiMgr.getWiFiRSSI());
+        if (wifiMgr.isProvisioningActive()) {
+            Serial.printf("Provisioning AP: %s (%s)\n",
+                          wifiMgr.getProvisioningSSID().c_str(),
+                          wifiMgr.getProvisioningIP().c_str());
+        }
         Serial.printf("MQTT: %s (msgs: %lu)\n",
                       mqttMgr.isConnected() ? "Connected" : "Disconnected",
                       mqttMgr.getMessageCount());
@@ -766,6 +843,9 @@ void printSystemStatus() {
     Serial.printf("Modbus Requests: %lu\n", modbusServer.getRequestCount());
     Serial.printf("Safe Mode: %s\n", sysHardening.isInSafeMode() ? "Yes" : "No");
     Serial.printf("Watchdog: %s\n", sysHardening.isWatchdogEnabled() ? "Enabled" : "Disabled");
+    Serial.printf("Thresholds: %.2f / %.2f\n",
+                  faultDetect.getWarningThreshold(),
+                  faultDetect.getCriticalThreshold());
     Serial.println("--------------------\n");
 }
 

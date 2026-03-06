@@ -55,7 +55,7 @@ void AlertManager::acknowledgealert(size_t index) {
 
 void AlertManager::acknowledgeAll() {
     for (auto& alert : alertHistory) {
-        alert.acknowledged = false;
+        alert.acknowledged = true;
     }
 }
 
@@ -120,6 +120,14 @@ void AlertManager::sendToChannels(const Alert& alert) {
         sendToSerial(alert);
     }
 
+    if (isChannelEnabled(CHANNEL_MQTT)) {
+        sendToMQTT(alert);
+    }
+
+    if (isChannelEnabled(CHANNEL_WEB)) {
+        sendToWeb(alert);
+    }
+
     if (isChannelEnabled(CHANNEL_LED)) {
         sendToLED(alert);
     }
@@ -146,12 +154,7 @@ void AlertManager::sendToSerial(const Alert& alert) {
 
 void AlertManager::sendToMQTT(const Alert& alert) {
     if (mqttMgr.isConnected()) {
-        String payload = "{\"type\":" + String((int)alert.type) +
-                        ",\"severity\":" + String((int)alert.severity) +
-                        ",\"message\":\"" + alert.message + "\"" +
-                        ",\"details\":\"" + alert.details + "\"" +
-                        ",\"timestamp\":" + String(alert.timestamp) + "}";
-        mqttMgr.publishAlert(payload.c_str(), alert.severity);
+        mqttMgr.publishAlert(alert.message.c_str(), alert.severity);
     }
 }
 

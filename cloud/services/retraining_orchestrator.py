@@ -63,6 +63,9 @@ class RetrainingOrchestrator:
         self.on_job_started: Optional[Callable] = None
         self.on_job_completed: Optional[Callable] = None
         self.on_job_failed: Optional[Callable] = None
+        production_model = self.deployment_manager.get_production_model() if self.deployment_manager else None
+        if production_model:
+            self.production_accuracy = production_model.get('accuracy', 0.0)
 
     def start(self, check_interval_seconds: int=3600):
         self.running = True
@@ -120,7 +123,7 @@ class RetrainingOrchestrator:
             train_data, val_data = self._prepare_data()
             if len(train_data) == 0:
                 raise ValueError('No training data available')
-            job.num_samples = len(train_data)
+            job.num_samples = len(train_data) + len(val_data)
             self._update_job_status(RetrainingStatus.TRAINING)
             logger.info(f'Training model with {len(train_data)} samples...')
             model, train_acc, val_acc = self._train_model(train_data, val_data)
@@ -160,9 +163,12 @@ class RetrainingOrchestrator:
 
     def _prepare_data(self):
         import numpy as np
-        samples = self.data_collector.get_training_dataset(min_confidence=0.5, labeled_only=True)
+        samples = self.data_collector.get_training_dataset(min_confidence=0.0, labeled_only=True)
+        if len(samples) < 2:
+            return (samples, [])
         np.random.shuffle(samples)
         split_idx = int(len(samples) * (1 - self.config.validation_split))
+        split_idx = min(max(split_idx, 1), len(samples) - 1)
         train_data = samples[:split_idx]
         val_data = samples[split_idx:]
         return (train_data, val_data)
@@ -171,12 +177,12 @@ class RetrainingOrchestrator:
         import numpy as np
         X_train = np.array([s['features'] for s in train_data], dtype=np.float32)
         y_train = np.array([s['true_label'] for s in train_data], dtype=np.int32)
-        X_val = np.array([s['features'] for s in val_data], dtype=np.float32)
-        y_val = np.array([s['true_label'] for s in val_data], dtype=np.int32)
+        X_val = np.array([s['features'] for s in val_data], dtype=np.float32) if val_data else None
+        y_val = np.array([s['true_label'] for s in val_data], dtype=np.int32) if val_data else None
         model = self.model_factory(input_dim=X_train.shape[1])
         history = model.fit(X_train, y_train, X_val=X_val, y_val=y_val, epochs=self.config.epochs, batch_size=self.config.batch_size, early_stopping_patience=self.config.early_stopping_patience, verbose=1)
         train_metrics = model.evaluate(X_train, y_train)
-        val_metrics = model.evaluate(X_val, y_val)
+        val_metrics = model.evaluate(X_val, y_val) if X_val is not None and y_val is not None else train_metrics
         return (model, train_metrics['accuracy'], val_metrics['accuracy'])
 
     def _validate_model(self, model, val_accuracy: float) -> bool:
@@ -186,12 +192,43 @@ class RetrainingOrchestrator:
 
     def _save_model(self, model) -> str:
         version = f"v{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-        model_path = self.models_dir / f'model_{version}'
+        model_path = self.models_dir / f'model_{version}.keras'
         model.save(str(model_path))
-        metadata = {'version': version, 'created_at': datetime.now().isoformat(), 'accuracy': self.current_job.val_accuracy if self.current_job else 0, 'num_samples': self.current_job.num_samples if self.current_job else 0}
+        artifact_path = model_path
+        tflite_path = self.models_dir / f'model_{version}.tflite'
+        if hasattr(model, 'export_tflite'):
+            try:
+                model.export_tflite(str(tflite_path))
+                artifact_path = tflite_path
+            except Exception as exc:
+                logger.warning(f'Custom TFLite export failed for {version}: {exc}')
+        else:
+            keras_model = getattr(model, 'model', model)
+            try:
+                import tensorflow as tf
+                converter = tf.lite.TFLiteConverter.from_keras_model(keras_model)
+                with open(tflite_path, 'wb') as file_obj:
+                    file_obj.write(converter.convert())
+                artifact_path = tflite_path
+            except Exception as exc:
+                logger.warning(f'Could not export TFLite model for {version}: {exc}')
+        metadata = {
+            'version': version,
+            'created_at': datetime.now().isoformat(),
+            'accuracy': self.current_job.val_accuracy if self.current_job else 0,
+            'num_samples': self.current_job.num_samples if self.current_job else 0,
+            'artifact_path': str(artifact_path)
+        }
         metadata_path = self.models_dir / f'model_{version}_metadata.json'
         with open(metadata_path, 'w') as f:
             json.dump(metadata, f, indent=2)
+        if self.deployment_manager:
+            self.deployment_manager.register_model(
+                str(artifact_path),
+                version,
+                accuracy=metadata['accuracy'],
+                metadata=metadata
+            )
         return version
 
     def get_job_status(self, job_id: str=None) -> Optional[Dict]:

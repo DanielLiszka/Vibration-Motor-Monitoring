@@ -7,6 +7,7 @@ from pathlib import Path
 import sqlite3
 import threading
 import queue
+import time
 logger = logging.getLogger(__name__)
 
 @dataclass
@@ -38,15 +39,18 @@ class DeviceStats:
 
 class DataCollector:
 
-    def __init__(self, database_path: str='./data/training_data.db', buffer_size: int=1000):
+    def __init__(self, database_path: str='./data/training_data.db', buffer_size: int=1000,
+                 flush_interval_seconds: float=5.0):
         self.database_path = Path(database_path)
         self.database_path.parent.mkdir(parents=True, exist_ok=True)
         self.buffer: List[TrainingSample] = []
         self.buffer_size = buffer_size
+        self.flush_interval_seconds = flush_interval_seconds
         self.buffer_lock = threading.Lock()
         self.sample_queue = queue.Queue()
         self.running = False
         self.worker_thread = None
+        self.last_flush_time = time.time()
         self._init_database()
         self.on_sample_received: Optional[Callable] = None
         self.on_batch_stored: Optional[Callable] = None
@@ -62,6 +66,8 @@ class DataCollector:
         conn.close()
 
     def start(self):
+        if self.running:
+            return
         self.running = True
         self.worker_thread = threading.Thread(target=self._worker_loop, daemon=True)
         self.worker_thread.start()
@@ -74,6 +80,9 @@ class DataCollector:
         self._flush_buffer()
         logger.info('Data collector stopped')
 
+    def flush(self):
+        self._flush_buffer()
+
     def _worker_loop(self):
         while self.running:
             try:
@@ -82,13 +91,19 @@ class DataCollector:
                     self._add_to_buffer(sample)
             except queue.Empty:
                 pass
-            if len(self.buffer) >= self.buffer_size:
+            if len(self.buffer) >= self.buffer_size or (
+                self.buffer and time.time() - self.last_flush_time >= self.flush_interval_seconds
+            ):
                 self._flush_buffer()
 
     def receive_sample(self, sample_data: Dict) -> bool:
         try:
             sample = TrainingSample.from_dict(sample_data)
-            self.sample_queue.put(sample)
+            if self.running:
+                self.sample_queue.put(sample)
+            else:
+                self._add_to_buffer(sample)
+                self._flush_buffer()
             if self.on_sample_received:
                 self.on_sample_received(sample)
             return True
@@ -124,6 +139,7 @@ class DataCollector:
                 cursor.execute('\n                    INSERT INTO samples\n                    (device_id, features, predicted_label, confidence,\n                     label_source, timestamp, received_at, true_label)\n                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)\n                ', (sample.device_id, json.dumps(sample.features), sample.predicted_label, sample.confidence, sample.label_source, sample.timestamp, sample.received_at.isoformat() if sample.received_at else datetime.now().isoformat(), sample.true_label))
                 cursor.execute('\n                    INSERT INTO devices (device_id, total_samples, last_seen)\n                    VALUES (?, 1, ?)\n                    ON CONFLICT(device_id) DO UPDATE SET\n                        total_samples = total_samples + 1,\n                        last_seen = excluded.last_seen\n                ', (sample.device_id, datetime.now().isoformat()))
             conn.commit()
+            self.last_flush_time = time.time()
             logger.info(f'Flushed {len(samples_to_store)} samples to database')
             if self.on_batch_stored:
                 self.on_batch_stored(len(samples_to_store))
@@ -155,8 +171,19 @@ class DataCollector:
         conn = sqlite3.connect(str(self.database_path))
         cursor = conn.cursor()
         try:
+            cursor.execute('SELECT device_id, true_label FROM samples WHERE id = ?', (sample_id,))
+            row = cursor.fetchone()
+            if not row:
+                return False
+
+            device_id = row[0]
+            was_unlabeled = row[1] is None
             cursor.execute('\n                UPDATE samples SET true_label = ? WHERE id = ?\n            ', (label, sample_id))
-            cursor.execute('\n                UPDATE devices SET labeled_samples = labeled_samples + 1\n                WHERE device_id = (SELECT device_id FROM samples WHERE id = ?)\n            ', (sample_id,))
+            if was_unlabeled:
+                cursor.execute(
+                    '\n                UPDATE devices SET labeled_samples = labeled_samples + 1\n                WHERE device_id = ?\n            ',
+                    (device_id,),
+                )
             conn.commit()
             return True
         except Exception as e:
@@ -168,8 +195,11 @@ class DataCollector:
     def get_training_dataset(self, min_confidence: float=0.0, labeled_only: bool=True, limit: int=None) -> List[Dict]:
         conn = sqlite3.connect(str(self.database_path))
         cursor = conn.cursor()
-        query = '\n            SELECT id, device_id, features, predicted_label, confidence,\n                   true_label, used_for_training\n            FROM samples\n            WHERE confidence >= ?\n        '
-        params = [min_confidence]
+        query = '\n            SELECT id, device_id, features, predicted_label, confidence,\n                   true_label, used_for_training\n            FROM samples\n            WHERE 1 = 1\n        '
+        params = []
+        if not labeled_only and min_confidence > 0:
+            query += ' AND confidence >= ?'
+            params.append(min_confidence)
         if labeled_only:
             query += ' AND true_label IS NOT NULL'
         if limit:
@@ -183,7 +213,29 @@ class DataCollector:
             samples.append({'sample_id': row[0], 'device_id': row[1], 'features': json.loads(row[2]), 'predicted_label': row[3], 'confidence': row[4], 'true_label': row[5] if row[5] is not None else row[3], 'used_for_training': bool(row[6])})
         return samples
 
+    def update_device_model_version(self, device_id: str, model_version: str) -> bool:
+        conn = sqlite3.connect(str(self.database_path))
+        cursor = conn.cursor()
+        try:
+            cursor.execute(
+                '''
+                UPDATE devices
+                SET model_version = ?, last_seen = ?
+                WHERE device_id = ?
+                ''',
+                (model_version, datetime.now().isoformat(), device_id)
+            )
+            conn.commit()
+            return cursor.rowcount > 0
+        except Exception as e:
+            logger.error(f'Error updating device model version: {e}')
+            return False
+        finally:
+            conn.close()
+
     def mark_used_for_training(self, sample_ids: List[int]):
+        if not sample_ids:
+            return
         conn = sqlite3.connect(str(self.database_path))
         cursor = conn.cursor()
         placeholders = ','.join('?' * len(sample_ids))

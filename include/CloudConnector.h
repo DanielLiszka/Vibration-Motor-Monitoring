@@ -14,6 +14,7 @@
 #define CLOUD_TIMEOUT 10000
 #define CLOUD_MODEL_VERSION_MAX_LEN 32
 #define CLOUD_MODEL_URL_MAX_LEN 192
+#define CLOUD_MODEL_HASH_MAX_LEN 65
 
 enum CloudProvider {
     CLOUD_NONE = 0,
@@ -99,6 +100,7 @@ public:
     bool hasPendingModelUpdate() const { return modelUpdateAvailable; }
     const char* getPendingModelVersion() const { return pendingModelVersion; }
     const char* getPendingModelUrl() const { return pendingModelUrl; }
+    const char* getPendingModelHash() const { return pendingModelHash; }
     void clearPendingModelUpdate();
 
     void setMessageCallback(CloudMessageCallback callback) { messageCallback = callback; }
@@ -124,6 +126,7 @@ protected:
 
     char pendingModelVersion[CLOUD_MODEL_VERSION_MAX_LEN];
     char pendingModelUrl[CLOUD_MODEL_URL_MAX_LEN];
+    char pendingModelHash[CLOUD_MODEL_HASH_MAX_LEN];
     bool modelUpdateAvailable;
 
     CloudMessageCallback messageCallback;

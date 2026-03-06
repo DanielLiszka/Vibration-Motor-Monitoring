@@ -66,7 +66,7 @@ def create_labeling_routes(labeling_service):
     return {'get_next_task': get_next_task, 'get_tasks_batch': get_tasks_batch, 'submit_label': submit_label, 'skip_task': skip_task, 'get_task': get_task, 'get_stats': get_stats, 'get_labeler_stats': get_labeler_stats, 'create_batch': create_batch, 'get_label_distribution': get_label_distribution, 'export_labels': export_labels}
 
 def register_flask_routes(app, labeling_service):
-    from flask import request, jsonify
+    from flask import request, jsonify, Response
     handlers = create_labeling_routes(labeling_service)
 
     @app.route('/api/labeling/next', methods=['GET'])
@@ -82,11 +82,11 @@ def register_flask_routes(app, labeling_service):
 
     @app.route('/api/labeling/submit', methods=['POST'])
     def submit():
-        return jsonify(handlers['submit_label'](request.json))
+        return jsonify(handlers['submit_label'](request.json or {}))
 
     @app.route('/api/labeling/skip', methods=['POST'])
     def skip():
-        return jsonify(handlers['skip_task'](request.json))
+        return jsonify(handlers['skip_task'](request.json or {}))
 
     @app.route('/api/labeling/task/<int:task_id>', methods=['GET'])
     def task(task_id):
@@ -96,10 +96,22 @@ def register_flask_routes(app, labeling_service):
     def stats():
         return jsonify(handlers['get_stats']())
 
+    @app.route('/api/labeling/labeler-stats', methods=['GET'])
+    def labeler_stats():
+        labeler_id = request.args.get('labeler_id')
+        return jsonify(handlers['get_labeler_stats'](labeler_id))
+
     @app.route('/api/labeling/create-batch', methods=['POST'])
     def create_batch():
-        return jsonify(handlers['create_batch'](request.json))
+        return jsonify(handlers['create_batch'](request.json or {}))
 
     @app.route('/api/labeling/distribution', methods=['GET'])
     def distribution():
         return jsonify(handlers['get_label_distribution']())
+
+    @app.route('/api/labeling/export', methods=['GET'])
+    def export():
+        export_format = request.args.get('format', 'json')
+        body = handlers['export_labels'](export_format)
+        mimetype = 'application/json' if export_format == 'json' else 'text/csv'
+        return Response(body, mimetype=mimetype)

@@ -3,6 +3,7 @@
 
 #include <Arduino.h>
 #include <WiFi.h>
+#include <DNSServer.h>
 #include <PubSubClient.h>
 #include "Config.h"
 #include "FeatureExtractor.h"
@@ -30,11 +31,15 @@ public:
     ~WiFiManager();
 
     bool begin();
+    bool begin(const char* ssid, const char* password, uint32_t timeoutMs = WIFI_TIMEOUT_MS);
 
     bool connectWiFi(const char* ssid, const char* password, uint32_t timeoutMs = WIFI_TIMEOUT_MS);
 
     bool connectMQTT(const char* broker, uint16_t port, const char* clientId,
                      const char* user = "", const char* password = "");
+
+    bool startProvisioningPortal(const char* apName = nullptr);
+    void stopProvisioningPortal();
 
     void disconnectWiFi();
 
@@ -57,6 +62,9 @@ public:
     MQTTStatus getMQTTStatus() const { return mqttStatus; }
 
     bool isWiFiConnected() const { return wifiStatus == WIFI_CONNECTED; }
+    bool isProvisioningActive() const { return provisioningActive; }
+    String getProvisioningSSID() const { return provisioningSsid; }
+    String getProvisioningIP() const;
 
     bool isMQTTConnected() const { return mqttStatus == MQTT_STATUS_CONNECTED; }
 
@@ -67,10 +75,14 @@ public:
 private:
     WiFiClient wifiClient;
     PubSubClient* mqttClient;
+    DNSServer* dnsServer;
 
     WiFiStatus wifiStatus;
     MQTTStatus mqttStatus;
 
+    String wifiSsid;
+    String wifiPassword;
+    String provisioningSsid;
     String mqttBroker;
     uint16_t mqttPort;
     String mqttClientId;
@@ -79,6 +91,8 @@ private:
 
     uint32_t lastReconnectAttempt;
     uint32_t reconnectInterval;
+    bool provisioningActive;
+    uint8_t reconnectFailures;
 
     bool reconnectWiFi();
 

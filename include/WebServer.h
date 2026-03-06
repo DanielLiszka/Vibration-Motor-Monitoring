@@ -5,6 +5,7 @@
 #include <WiFi.h>
 #include <ESPAsyncWebServer.h>
 #include <AsyncTCP.h>
+#include <SPIFFS.h>
 #include "Config.h"
 #include "FeatureExtractor.h"
 #include "FaultDetector.h"
@@ -26,6 +27,8 @@ public:
     void updateFault(const FaultResult& fault);
     void updatePerformance(const PerformanceMetrics& metrics);
     void updateSpectrum(const float* spectrum, size_t length);
+    void setBroadcastInterval(uint32_t intervalMs);
+    uint32_t getBroadcastInterval() const { return broadcastInterval; }
 
     void broadcastData();
     void broadcastMessage(const String& message);

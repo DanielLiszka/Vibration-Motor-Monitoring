@@ -49,6 +49,16 @@ bool MotorWebServer::begin() {
     return true;
 }
 
+void MotorWebServer::setBroadcastInterval(uint32_t intervalMs) {
+    if (intervalMs < 100) {
+        intervalMs = 100;
+    }
+    if (intervalMs > 5000) {
+        intervalMs = 5000;
+    }
+    broadcastInterval = intervalMs;
+}
+
 void MotorWebServer::loop() {
     ws->cleanupClients();
 
@@ -97,14 +107,6 @@ void MotorWebServer::broadcastAlert(const String& alertJson) {
 }
 
 void MotorWebServer::setupRoutes() {
-    server->on("/", HTTP_GET, [this](AsyncWebServerRequest* request) {
-        this->handleRoot(request);
-    });
-
-    server->on("/config", HTTP_GET, [this](AsyncWebServerRequest* request) {
-        this->handleConfig(request);
-    });
-
     server->on("/api/status", HTTP_GET, [this](AsyncWebServerRequest* request) {
         this->handleAPI(request);
     });
@@ -134,7 +136,33 @@ void MotorWebServer::setupRoutes() {
         request->send(200, "application/json", "{\"status\":\"ok\"}");
     });
 
+    const bool hasStaticDashboard =
+        SPIFFS.exists("/index.html") &&
+        SPIFFS.exists("/dashboard.js") &&
+        SPIFFS.exists("/style.css");
+
+    if (hasStaticDashboard) {
+        server->serveStatic("/", SPIFFS, "/").setDefaultFile("index.html");
+        server->on("/config", HTTP_GET, [](AsyncWebServerRequest* request) {
+            request->redirect("/#config");
+        });
+    } else {
+        server->on("/", HTTP_GET, [this](AsyncWebServerRequest* request) {
+            this->handleRoot(request);
+        });
+
+        server->on("/config", HTTP_GET, [this](AsyncWebServerRequest* request) {
+            this->handleConfig(request);
+        });
+    }
+
     server->onNotFound([](AsyncWebServerRequest* request) {
+        if (request->method() == HTTP_GET &&
+            !request->url().startsWith("/api/") &&
+            request->url() != "/ws") {
+            request->redirect("/");
+            return;
+        }
         request->send(404, "text/plain", "Not Found");
     });
 }

@@ -12,6 +12,12 @@
 #include "AlertManager.h"
 #include "EdgeML.h"
 #include "PerformanceMonitor.h"
+#include "DataBuffer.h"
+#include "RuntimeConfig.h"
+
+class MotorWebServer;
+class MQTTManager;
+class WiFiManager;
 
 #define REST_API_VERSION "1.0.0"
 #define REST_MAX_BODY_SIZE 8192
@@ -35,6 +41,11 @@ public:
     void setAlertManager(AlertManager* am) { alertManager = am; }
     void setEdgeML(EdgeML* ml) { edgeML = ml; }
     void setPerformanceMonitor(PerformanceMonitor* pm) { performanceMonitor = pm; }
+    void setDataBuffer(DataBuffer* buffer) { dataBuffer = buffer; }
+    void setRuntimeConfig(RuntimeConfigManager* config) { runtimeConfig = config; }
+    void setWebServerController(MotorWebServer* web) { dashboardController = web; }
+    void setMQTTManager(MQTTManager* manager) { mqttManager = manager; }
+    void setWiFiManager(WiFiManager* manager) { wifiManager = manager; }
     void setCalibrationCallback(void (*callback)()) { calibrationCallback = callback; }
 
     void updateFeatures(const FeatureVector& features);
@@ -56,6 +67,11 @@ private:
     AlertManager* alertManager;
     EdgeML* edgeML;
     PerformanceMonitor* performanceMonitor;
+    DataBuffer* dataBuffer;
+    RuntimeConfigManager* runtimeConfig;
+    MotorWebServer* dashboardController;
+    MQTTManager* mqttManager;
+    WiFiManager* wifiManager;
 
     FeatureVector latestFeatures;
     FaultResult latestFault;
@@ -93,6 +109,7 @@ private:
     void handlePostThresholds(AsyncWebServerRequest* request, uint8_t* data, size_t len);
     void handlePostMLTrain(AsyncWebServerRequest* request, uint8_t* data, size_t len);
     void handlePostMLPredict(AsyncWebServerRequest* request, uint8_t* data, size_t len);
+    void handlePostAcknowledgeAlerts(AsyncWebServerRequest* request);
 
     void handleDeleteAlert(AsyncWebServerRequest* request);
     void handleDeleteAlerts(AsyncWebServerRequest* request);

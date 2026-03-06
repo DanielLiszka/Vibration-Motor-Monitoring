@@ -1,5 +1,25 @@
 #include "ContinuousLearningManager.h"
 #include <ArduinoJson.h>
+#include <mbedtls/sha256.h>
+
+namespace {
+String computeSha256Hex(const uint8_t* data, size_t length) {
+    uint8_t digest[32];
+    mbedtls_sha256_context ctx;
+    mbedtls_sha256_init(&ctx);
+    mbedtls_sha256_starts(&ctx, 0);
+    mbedtls_sha256_update(&ctx, data, length);
+    mbedtls_sha256_finish(&ctx, digest);
+    mbedtls_sha256_free(&ctx);
+
+    char hex[65];
+    for (size_t i = 0; i < sizeof(digest); i++) {
+        snprintf(hex + (i * 2), sizeof(hex) - (i * 2), "%02x", digest[i]);
+    }
+    hex[64] = '\0';
+    return String(hex);
+}
+}
 
 ContinuousLearningManager::ContinuousLearningManager()
     : currentState(CL_STATE_IDLE)
@@ -331,6 +351,7 @@ bool ContinuousLearningManager::downloadAndApplyUpdate() {
 
     const char* url = cloudConnector->getPendingModelUrl();
     const char* version = cloudConnector->getPendingModelVersion();
+    const char* expectedHash = cloudConnector->getPendingModelHash();
     if (!url || url[0] == '\0' || !version || version[0] == '\0') {
         return false;
     }
@@ -347,6 +368,27 @@ bool ContinuousLearningManager::downloadAndApplyUpdate() {
     if (!downloaded || downloadedSize == 0) {
         free(buffer);
         DEBUG_PRINTLN("Model download failed");
+        return false;
+    }
+
+    if (!expectedHash || expectedHash[0] == '\0') {
+        free(buffer);
+        DEBUG_PRINTLN("Model update rejected: missing expected SHA-256 hash");
+        cloudConnector->clearPendingModelUpdate();
+        if (modelUpdateCb) {
+            modelUpdateCb(false, version);
+        }
+        return false;
+    }
+
+    String actualHash = computeSha256Hex(buffer, downloadedSize);
+    if (!actualHash.equalsIgnoreCase(expectedHash)) {
+        free(buffer);
+        DEBUG_PRINTLN("Model update rejected: hash verification failed");
+        cloudConnector->clearPendingModelUpdate();
+        if (modelUpdateCb) {
+            modelUpdateCb(false, version);
+        }
         return false;
     }
 

@@ -44,6 +44,12 @@ logs/
 *.temp
 *.bak
 *.old
+.pytest_cache/
+cloud/runtime/
+.cloud_data/
+.cloud_data*/
+cloud_runtime/
+tests_py/
 
 credentials.h
 secrets.h

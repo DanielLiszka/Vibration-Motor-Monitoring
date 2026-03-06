@@ -100,6 +100,8 @@ public:
     void classifyFault(const FeatureVector& features, FaultResult& result);
 
     void setThresholds(float warningMultiplier, float criticalMultiplier);
+    float getWarningThreshold() const { return warningThreshold; }
+    float getCriticalThreshold() const { return criticalThreshold; }
 
     void reset();
 

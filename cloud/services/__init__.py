@@ -1,4 +1,5 @@
 from .data_collector import DataCollector
 from .retraining_orchestrator import RetrainingOrchestrator
 from .deployment_manager import DeploymentManager
-from .labeling_service import LabelingService
+from .persistent_labeling_service import LabelingService
+from .mqtt_notifier import MQTTDeploymentNotifier
