@@ -1,14 +1,8 @@
 # Motor Vibration Monitor
 
-Motor Vibration Monitor is an ESP32-based vibration monitor for small motors and rotating equipment. It uses an MPU6050 accelerometer to sample vibration, compute a frequency spectrum on-device, and compare the current signal against a learned baseline. When the behavior drifts, it can raise warnings, publish telemetry, and expose the results through a local web dashboard.
+Motor Vibration Monitor is firmware for an ESP32 + MPU6050 that watches motor vibration and flags changes that can hint at mechanical issues (imbalance, misalignment, bearing wear, looseness).
 
-The project is meant for diagnostics, prototyping, and condition-monitoring experiments. It is not a safety system, and it should not be the only layer protecting people, machinery, or production equipment.
-
-## What the firmware does
-
-In normal operation, the device samples acceleration at a fixed rate, processes each window with an FFT, extracts a small set of time-domain and frequency-domain features, and scores those features against a baseline captured during calibration. That baseline represents a known-good operating state for the motor with the sensor mounted in its final position.
-
-On top of that core loop, the firmware can serve a local dashboard, publish MQTT telemetry, accept runtime configuration through a REST API, collect samples for cloud-side labeling and retraining, and apply verified model updates when they are available.
+It's useful for diagnostics, experimentation, and learning. It is not a safety system and shouldn't be the only thing you rely on to protect people or equipment.
 
 ## Hardware
 
