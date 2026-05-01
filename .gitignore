@@ -36,6 +36,10 @@ __pycache__/
 env/
 venv/
 ENV/
+.env
+.env.*
+!.env.example
+!.env.sample
 
 *.log
 logs/
@@ -50,17 +54,35 @@ cloud/runtime/
 .cloud_data*/
 cloud_runtime/
 tests_py/
+.tmp_git_test/
 
 credentials.h
 secrets.h
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+*.cer
 
 test_data/
 *.csv
+!partitions_ota_spiffs.csv
 *.dat
+*.db
+*.sqlite
+*.sqlite3
+*.keras
+*.tflite
+*.h5
+*.onnx
+*.npy
+*.npz
 
 docs/_build/
 docs/html/
 docs/latex/
+/docs/
 
 Thumbs.db
 .DS_Store
