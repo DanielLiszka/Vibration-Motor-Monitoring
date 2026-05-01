@@ -11,7 +11,6 @@ The intended hardware is simple:
 - an ESP32 development board
 - an MPU6050 breakout over I2C
 - stable 3.3V power
-- a rigid mounting method for the sensor
 
 By default, the firmware expects the following wiring, which matches the values in `include/Config.h`:
 
